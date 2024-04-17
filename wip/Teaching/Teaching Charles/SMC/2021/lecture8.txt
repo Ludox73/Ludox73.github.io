@@ -1,7 +1,0 @@
-Bits of Wed 10.2.
-A brief detour on derived functors to give a rough idea of a conceptual definition of cohomology (not needed for exercises and exam). If interested to dig a bit deeper, see also:
-- https://mathoverflow.net/questions/208514/derived-functors-homotopical-vs-homological-approach/290629#290629
-- https://mathoverflow.net/questions/47771/derived-functor/47780
-
-Wed 10.3 : Lemma 10.9, Def 10.10, Def 9.2, Thm 9.14 (statement only), Rem 10.11, Prop 9.1 (statement only), Prop 10.12
-

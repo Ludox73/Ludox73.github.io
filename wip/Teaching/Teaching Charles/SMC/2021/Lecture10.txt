@@ -1,7 +1,0 @@
-The notions of tangent and contangent spaces of a (pre)manifold were given as a prerequisite for this class. For a nice and quick review, check out §5.1.
-
-- Brief review of the tangent bundle (8.52) and remark that the tangent bundle of S^2 is not trivial (hairy ball theorem).
-- All of §8.5. Proposition 8.57 only the statement.
-- All of §8.6.
-- All of §10.4, except for Mittag-Leffler.
-- Statement of Mayer-Vietoris (Proposition 10.31).

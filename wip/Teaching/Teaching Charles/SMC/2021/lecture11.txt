@@ -1,3 +1,0 @@
-A good intuition for homology (resp. cohomology) is provided at the beginning oh Chapter 2 (resp. Chapter 3) of the book Algebraic Topology by A. Hatcher, freely available at the link: https://pi.math.cornell.edu/~hatcher/AT/AT.pdf
-
-Wedhorn: §11.1 up to example 11.8.
