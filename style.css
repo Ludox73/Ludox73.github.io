@@ -61,10 +61,10 @@ main .page__title-container {
     width: 100%
 }
 
-    main .page__title-container a {
-        margin-left: auto
-        color: #091A22;
-    }
+main .page__title-container a {
+    margin-left: auto;
+    color: #091A22;
+}
 
 /* Spacing */
 a, a:hover, a:visited {
