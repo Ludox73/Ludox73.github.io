@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Gluing Involution Test</title>
+<script src="js/geometry.js"></script>
+<script src="js/hexagons.js"></script>
+<script src="js/geodesic.js"></script>
+<style>
+  body { font-family: monospace; background: #0d1117; color: #c9d1d9; margin: 16px; font-size: 13px; }
+  h1 { color: #58a6ff; margin-bottom: 4px; }
+  h2 { color: #79c0ff; margin: 18px 0 6px; font-size: 15px; }
+  h3 { color: #d2a8ff; margin: 14px 0 4px; font-size: 13px; }
+  p.desc { color: #8b949e; margin: 0 0 12px; }
+  .summary-box { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 10px 14px; margin-bottom: 16px; }
+  .summary-box .stat { display: inline-block; margin-right: 24px; }
+  .summary-box .val { font-size: 20px; font-weight: bold; }
+  .pass-val { color: #3fb950; }
+  .fail-val { color: #f85149; }
+  .warn-val { color: #d29922; }
+  table { border-collapse: collapse; width: 100%; margin-bottom: 16px; }
+  th { background: #21262d; color: #79c0ff; padding: 4px 8px; text-align: left; border-bottom: 1px solid #30363d; position: sticky; top: 0; }
+  td { padding: 3px 8px; border-bottom: 1px solid #161b22; }
+  tr.pass td { color: #c9d1d9; }
+  tr.fail td { background: #1c0a0a; color: #ffa198; }
+  tr.fail td.dist-cell { color: #f85149; font-weight: bold; }
+  tr.pass td.dist-cell { color: #3fb950; }
+  .section-sep { border-top: 2px solid #21262d; margin-top: 12px; padding-top: 12px; }
+  .tag-simple { color: #79c0ff; }
+  .tag-twisted { color: #d2a8ff; }
+  .config-header { background: #161b22; padding: 6px 10px; border-radius: 4px; margin: 10px 0 6px; color: #e3b341; display: flex; gap: 24px; flex-wrap: wrap; }
+  .config-header span { color: #8b949e; }
+  .config-header span b { color: #c9d1d9; }
+  #controls { background: #161b22; border: 1px solid #30363d; border-radius: 6px; padding: 12px; margin-bottom: 16px; display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-end; }
+  .ctrl-group { display: flex; flex-direction: column; gap: 4px; }
+  .ctrl-group label { color: #8b949e; font-size: 12px; }
+  select, input[type=number] { background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 4px; padding: 4px 6px; font-family: monospace; font-size: 12px; }
+  button { background: #238636; color: #fff; border: none; border-radius: 6px; padding: 6px 14px; cursor: pointer; font-size: 13px; }
+  button:hover { background: #2ea043; }
+  .pi-label { color: #8b949e; font-size: 11px; margin-left: 4px; }
+  #status { color: #e3b341; margin-bottom: 8px; }
+</style>
+</head>
+<body>
+<h1>Gluing Involution Test</h1>
+<p class="desc">
+  Checks that if a point P on side (hex, s) is sent to Q on (hex', s') by the gluing,
+  then Q is sent back to P. Tests both <b>separating</b> and <b>nonseparating</b>
+  decompositions, all sides (simple and twisted), and various twist values.
+</p>
+
+<div id="controls">
+  <div class="ctrl-group">
+    <label>Decomposition</label>
+    <select id="sel-gluing">
+      <option value="both">Both</option>
+      <option value="separating">Separating only</option>
+      <option value="nonseparating">Nonseparating only</option>
+    </select>
+  </div>
+  <div class="ctrl-group">
+    <label>L1</label>
+    <input type="number" id="inp-l1" value="2.0" min="0.5" max="7" step="0.1" style="width:60px">
+  </div>
+  <div class="ctrl-group">
+    <label>L2</label>
+    <input type="number" id="inp-l2" value="3.0" min="0.5" max="7" step="0.1" style="width:60px">
+  </div>
+  <div class="ctrl-group">
+    <label>L3</label>
+    <input type="number" id="inp-l3" value="4.0" min="0.5" max="7" step="0.1" style="width:60px">
+  </div>
+  <div class="ctrl-group">
+    <label>T1 (×2π)</label>
+    <input type="number" id="inp-t1" value="0.25" min="0" max="1" step="0.05" style="width:60px">
+  </div>
+  <div class="ctrl-group">
+    <label>T2 (×2π)</label>
+    <input type="number" id="inp-t2" value="0.25" min="0" max="1" step="0.05" style="width:60px">
+  </div>
+  <div class="ctrl-group">
+    <label>T3 (×2π)</label>
+    <input type="number" id="inp-t3" value="0.25" min="0" max="1" step="0.05" style="width:60px">
+  </div>
+  <button onclick="runTests()">Run Tests</button>
+</div>
+
+<div id="status"></div>
+<div id="global-summary"></div>
+<div id="output"></div>
+
+<script>
+// ─── Geometry helpers ───────────────────────────────────────────────────────
+
+/** A point at fraction t ∈ (0,1) along the hyperbolic geodesic from v1 to v2.
+ *  Uses the arc-angle parametrisation of the geodesic circle. */
+function pointOnSide(v1, v2, t) {
+  const gc = geodesicCircumferenceFromSegment(v1, v2);
+  const cc = gc.center, rc = gc.radius;
+  const a1 = Math.atan2(v1[1] - cc[1], v1[0] - cc[0]);
+  const a2 = Math.atan2(v2[1] - cc[1], v2[0] - cc[0]);
+  let da = a2 - a1;
+  // Choose the arc that stays inside the unit disk (shorter angular span)
+  while (da >  Math.PI) da -= 2 * Math.PI;
+  while (da < -Math.PI) da += 2 * Math.PI;
+  const at = a1 + da * t;
+  return [cc[0] + rc * Math.cos(at), cc[1] + rc * Math.sin(at)];
+}
+
+/** Apply the pairing isometry to a point (tangent vector ignored). */
+function applyIsoToPoint(iso, pt) {
+  return applyPoincarePointAndVector(iso.poincare, pt, [1, 0]).point;
+}
+
+// ─── Core involution test ────────────────────────────────────────────────────
+
+/**
+ * Test that gluing is an involution on each side.
+ * Returns an array of result objects.
+ */
+function testInvolution(gluingName, gluing, lengths, twistedParams) {
+  const polytopes = buildPolytopes(gluing, lengths);
+  const results = [];
+
+  // Test t-fractions along each side (avoid exact endpoints = shared vertices)
+  const testTs = [0.1, 0.3, 0.5, 0.7, 0.9];
+
+  for (let hex = 0; hex < 4; hex++) {
+    for (let side = 0; side < 6; side++) {
+      const pairingData = gluing.pairings[hex][side];
+      if (!pairingData) continue;
+
+      const v1 = polytopes[hex][side];
+      const v2 = polytopes[hex][(side + 1) % 6];
+
+      for (const t of testTs) {
+        const P = pointOnSide(v1, v2, t);
+
+        // Sanity: P should be inside the unit disk
+        const pNorm2 = P[0]*P[0] + P[1]*P[1];
+        if (pNorm2 >= 1 - 1e-9) {
+          results.push({ gluingName, hex, side, t, type: pairingData.type,
+            error: 'P outside disk', dist: NaN, pass: false,
+            outHex: -1, outSide: -1, backHex: -1, backSide: -1, P, Q: null, Pprime: null });
+          continue;
+        }
+
+        // Step 1: P → Q
+        let pr1;
+        try {
+          pr1 = pairingFromGluing(gluing, hex, side, twistedParams, P, polytopes);
+        } catch(e) {
+          results.push({ gluingName, hex, side, t, type: pairingData.type,
+            error: 'pairingFromGluing threw: ' + e, dist: NaN, pass: false,
+            outHex: -1, outSide: -1, backHex: -1, backSide: -1, P, Q: null, Pprime: null });
+          continue;
+        }
+        const Q = applyIsoToPoint(pr1.iso, P);
+        const outHex = pr1.outHex;
+        const outSide = pr1.outSide;
+
+        // Step 2: Q → P'
+        let pr2;
+        try {
+          pr2 = pairingFromGluing(gluing, outHex, outSide, twistedParams, Q, polytopes);
+        } catch(e) {
+          results.push({ gluingName, hex, side, t, type: pairingData.type,
+            error: 'reverse pairingFromGluing threw: ' + e, dist: NaN, pass: false,
+            outHex, outSide, backHex: -1, backSide: -1, P, Q, Pprime: null });
+          continue;
+        }
+        const Pprime = applyIsoToPoint(pr2.iso, Q);
+        const backHex = pr2.outHex;
+        const backSide = pr2.outSide;
+
+        const dist = distanceTwoPoints(P, Pprime);
+        const hexSideMatch = (backHex === hex && backSide === side);
+        const pass = dist < 1e-6;
+
+        results.push({
+          gluingName, hex, side, t,
+          type: pairingData.type,
+          error: null, dist, pass,
+          hexSideMatch,
+          outHex, outSide, backHex, backSide,
+          P, Q, Pprime
+        });
+      }
+    }
+  }
+  return results;
+}
+
+// ─── Rendering helpers ───────────────────────────────────────────────────────
+
+function fmt(x) {
+  if (isNaN(x)) return '<span style="color:#d29922">NaN</span>';
+  if (!isFinite(x)) return '<span style="color:#d29922">Inf</span>';
+  return x.toExponential(3);
+}
+
+function fmtPt(pt) {
+  if (!pt) return '—';
+  return `(${pt[0].toFixed(4)}, ${pt[1].toFixed(4)})`;
+}
+
+function renderTable(results) {
+  let html = '<table><thead><tr>'
+    + '<th>Hex</th><th>Side</th><th>t</th><th>Type</th>'
+    + '<th>P → (H\',S\')</th><th>P\' ← (H\'\',S\'\')</th>'
+    + '<th>P</th><th>Q</th><th>P\'</th>'
+    + '<th>dist(P,P\')</th><th>Pass</th>'
+    + '</tr></thead><tbody>';
+
+  for (const r of results) {
+    const cls = r.pass ? 'pass' : 'fail';
+    const typeTag = r.type === 'twisted'
+      ? '<span class="tag-twisted">twisted</span>'
+      : '<span class="tag-simple">simple</span>';
+    const arrow1 = r.outHex >= 0 ? `(${r.outHex},${r.outSide})` : '—';
+    const arrow2 = r.backHex >= 0 ? `(${r.backHex},${r.backSide})` : '—';
+    const hexMatch = r.hexSideMatch === undefined ? '' :
+      (r.hexSideMatch ? ' <span style="color:#3fb950">✓</span>' : ' <span style="color:#f85149">✗</span>');
+    const passCell = r.error
+      ? `<span style="color:#d29922">${r.error}</span>`
+      : (r.pass ? '<span style="color:#3fb950">PASS</span>' : '<span style="color:#f85149">FAIL</span>');
+
+    html += `<tr class="${cls}">
+      <td>${r.hex}</td>
+      <td>${r.side}</td>
+      <td>${r.t.toFixed(1)}</td>
+      <td>${typeTag}</td>
+      <td>${arrow1}</td>
+      <td>${arrow2}${hexMatch}</td>
+      <td>${fmtPt(r.P)}</td>
+      <td>${fmtPt(r.Q)}</td>
+      <td>${fmtPt(r.Pprime)}</td>
+      <td class="dist-cell">${fmt(r.dist)}</td>
+      <td>${passCell}</td>
+    </tr>`;
+  }
+
+  html += '</tbody></table>';
+  return html;
+}
+
+function renderSummary(label, results) {
+  const total = results.length;
+  const passed = results.filter(r => r.pass).length;
+  const failed = total - passed;
+  const maxDist = Math.max(...results.map(r => isFinite(r.dist) ? r.dist : 0));
+  const cls = failed > 0 ? 'fail-val' : 'pass-val';
+  return `<div class="summary-box">
+    <b style="color:#e3b341">${label}</b><br>
+    <span class="stat"><span class="val ${cls}">${passed}/${total}</span> passed</span>
+    <span class="stat"><span class="val ${failed > 0 ? 'fail-val' : 'pass-val'}">${failed}</span> failed</span>
+    <span class="stat">max dist: <span class="val ${maxDist > 1e-6 ? 'fail-val' : 'pass-val'}">${fmt(maxDist)}</span></span>
+  </div>`;
+}
+
+// ─── Test runner ─────────────────────────────────────────────────────────────
+
+const TWIST_CONFIGS = [
+  { label: 'No twist (0, 0, 0)',           t: [0, 0, 0] },
+  { label: 'T1=¼ (π/2, 0, 0)',            t: [Math.PI/2, 0, 0] },
+  { label: 'T1=½ (π, 0, 0)',              t: [Math.PI, 0, 0] },
+  { label: 'Equal ¼ (π/2, π/2, π/2)',     t: [Math.PI/2, Math.PI/2, Math.PI/2] },
+  { label: 'Equal ½ (π, π, π)',           t: [Math.PI, Math.PI, Math.PI] },
+  { label: 'Mixed (π/3, 2π/3, π)',        t: [Math.PI/3, 2*Math.PI/3, Math.PI] },
+  { label: 'Mixed (0.7π, 0.3π, 1.1π)',   t: [0.7*Math.PI, 0.3*Math.PI, 1.1*Math.PI] },
+  { label: 'Custom (from controls)',       custom: true },
+];
+
+function runTests() {
+  const sel = document.getElementById('sel-gluing').value;
+  const L = [
+    parseFloat(document.getElementById('inp-l1').value),
+    parseFloat(document.getElementById('inp-l2').value),
+    parseFloat(document.getElementById('inp-l3').value),
+  ];
+  const customT = [
+    parseFloat(document.getElementById('inp-t1').value) * 2 * Math.PI,
+    parseFloat(document.getElementById('inp-t2').value) * 2 * Math.PI,
+    parseFloat(document.getElementById('inp-t3').value) * 2 * Math.PI,
+  ];
+
+  const gluings = [];
+  if (sel === 'both' || sel === 'separating')
+    gluings.push({ name: 'Separating', fn: createGluingSeparatingS2 });
+  if (sel === 'both' || sel === 'nonseparating')
+    gluings.push({ name: 'Nonseparating', fn: createGluingNonseparatingS2 });
+
+  document.getElementById('status').textContent = 'Running…';
+
+  let allResults = [];
+  let html = '';
+
+  for (const gDef of gluings) {
+    html += `<div class="section-sep"><h2>${gDef.name} decomposition — L=[${L.join(', ')}]</h2>`;
+    const gluing = gDef.fn();
+    let gluingAllResults = [];
+
+    for (const tc of TWIST_CONFIGS) {
+      const twists = tc.custom ? customT : tc.t;
+      const tLabel = tc.custom
+        ? `Custom T=[${customT.map(v=>(v/(2*Math.PI)).toFixed(3)).join(', ')}]×2π`
+        : tc.label;
+
+      const results = testInvolution(gDef.name, gluing, L, twists);
+      gluingAllResults = gluingAllResults.concat(results);
+      allResults = allResults.concat(results);
+
+      const passed = results.filter(r => r.pass).length;
+      const failed = results.length - passed;
+      const maxDist = Math.max(...results.map(r => isFinite(r.dist) ? r.dist : 0));
+      const statusClass = failed > 0 ? 'fail-val' : 'pass-val';
+
+      // Collapsible section per twist config
+      const id = `tc_${gDef.name}_${tc.label}`.replace(/[^a-zA-Z0-9]/g,'_');
+      html += `<h3 onclick="toggleSection('${id}')" style="cursor:pointer">
+        ▶ ${tLabel}
+        &nbsp;<span class="${statusClass}">${passed}/${results.length} pass</span>
+        &nbsp;max dist: <span class="${failed>0?'fail-val':'pass-val'}">${fmt(maxDist)}</span>
+      </h3>`;
+      html += `<div id="${id}" style="display:${failed>0?'block':'none'}">`;
+      html += renderTable(results);
+      html += '</div>';
+    }
+
+    html += renderSummary(`${gDef.name} total`, gluingAllResults);
+    html += '</div>';
+  }
+
+  // Global summary at top
+  const totalPassed = allResults.filter(r => r.pass).length;
+  const totalFailed = allResults.length - totalPassed;
+  let globalHtml = `<div class="summary-box">
+    <b style="color:#58a6ff;font-size:15px">Global Summary</b><br>
+    <span class="stat"><span class="val ${totalFailed>0?'fail-val':'pass-val'}">${totalPassed}/${allResults.length}</span> passed</span>
+    <span class="stat"><span class="val ${totalFailed>0?'fail-val':'pass-val'}">${totalFailed}</span> failed</span>
+  </div>`;
+
+  document.getElementById('global-summary').innerHTML = globalHtml;
+  document.getElementById('output').innerHTML = html;
+  document.getElementById('status').textContent =
+    totalFailed > 0
+      ? `Done. ${totalFailed} test(s) FAILED — check red sections below.`
+      : `Done. All ${totalPassed} tests passed.`;
+  document.getElementById('status').style.color = totalFailed > 0 ? '#f85149' : '#3fb950';
+}
+
+function toggleSection(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+// Auto-run on load
+window.addEventListener('load', runTests);
+</script>
+</body>
+</html>

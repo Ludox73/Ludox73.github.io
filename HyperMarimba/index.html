@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HyperMozart – Demo</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<h1>HyperMozart</h1>
+<p class="subtitle">Geodesics on genus-2 hyperbolic surfaces — Separating S2 decomposition</p>
+<div class="container">
+
+<!-- Parameters Panel -->
+<div class="panel params-panel">
+<div class="group">
+<div class="group-title">Decomposition</div>
+<select id="gluing-type" style="width:100%">
+<option value="separating">Separating S2</option>
+<option value="nonseparating">Nonseparating S2</option>
+</select>
+</div>
+<div class="group">
+<div class="group-title">Curve Lengths</div>
+<label>L1 <span class="val" id="v-l1">2.00</span></label>
+<input type="range" id="l1" min="1" max="7" step="0.01" value="2.00">
+<label>L2 <span class="val" id="v-l2">3.00</span></label>
+<input type="range" id="l2" min="1" max="7" step="0.01" value="3.00">
+<label>L3 <span class="val" id="v-l3">4.00</span></label>
+<input type="range" id="l3" min="1" max="7" step="0.01" value="4.00">
+</div>
+<div class="group">
+<div class="group-title">Twist Parameters</div>
+<label>T1 <span class="val" id="v-t1">0%</span></label>
+<input type="range" id="t1" min="0" max="100" step="0.5" value="0">
+<label>T2 <span class="val" id="v-t2">0%</span></label>
+<input type="range" id="t2" min="0" max="100" step="0.5" value="0">
+<label>T3 <span class="val" id="v-t3">0%</span></label>
+<input type="range" id="t3" min="0" max="100" step="0.5" value="0">
+</div>
+<div class="group">
+<div class="group-title">Active Curves</div>
+<div class="checkbox-row"><input type="checkbox" id="curve1-active" checked><label for="curve1-active">Curve 1</label></div>
+<div class="checkbox-row"><input type="checkbox" id="curve2-active" checked><label for="curve2-active">Curve 2</label></div>
+<div class="checkbox-row"><input type="checkbox" id="curve3-active" checked><label for="curve3-active">Curve 3</label></div>
+</div>
+<div class="group">
+<div class="group-title">Geodesic</div>
+<label>Max length <span class="val" id="v-maxlen">100.0k</span></label>
+<input type="range" id="maxlen" min="0" max="100" step="1" value="50" list="maxlen-ticks">
+<datalist id="maxlen-ticks">
+<option value="0" label="1k"></option>
+<option value="25" label="10k"></option>
+<option value="50" label="100k"></option>
+<option value="75" label="1M"></option>
+<option value="100" label="10M"></option>
+</datalist>
+<label>Drawing speed <span class="val" id="v-speed">2</span></label>
+<input type="range" id="speed" min="1" max="100" step="0.5" value="2">
+<div class="checkbox-row">
+<input type="checkbox" id="fast-mode"><label for="fast-mode">Fast mode (no visualization)</label>
+</div>
+</div>
+<button onclick="document.getElementById('arc-save-filters').style.display=document.getElementById('arc-save-filters').style.display==='none'?'':'none'" style="background:none;border:1px solid #0f3460;padding:4px 8px;font-size:.75rem;color:#a0a0c0;width:auto;margin-bottom:2px">Arc save filters ▾</button>
+<div id="arc-save-filters" style="display:none;font-size:.75rem;margin-bottom:6px;padding:6px;background:#0f1a30;border-radius:6px;border:1px solid #0f3460">
+<label style="margin:0">Max count <input type="number" id="arc-save-max" value="5000" min="1" max="10000000" style="width:60px"></label>
+<label style="margin:2px 0 0">Length <input type="number" id="arc-save-lmin" value="0" step="0.1" style="width:48px"> – <input type="number" id="arc-save-lmax" value="999999" step="0.1" style="width:48px"></label>
+<label style="margin:2px 0 0">Init ∠ <input type="number" id="arc-save-iamin" value="1.54" step="0.01" style="width:48px"> – <input type="number" id="arc-save-iamax" value="1.60" step="0.01" style="width:48px"></label>
+<label style="margin:2px 0 0">Final ∠ <input type="number" id="arc-save-famin" value="1.54" step="0.01" style="width:48px"> – <input type="number" id="arc-save-famax" value="1.60" step="0.01" style="width:48px"></label>
+<button onclick="setArcFilterPerp()" style="width:auto;padding:2px 8px;font-size:.7rem;margin-top:3px">Almost perpendicular</button>
+</div>
+<button id="btn-run" onclick="startComputation()">Run Geodesic</button>
+<button id="btn-stop" class="stop" onclick="stopComputation()" disabled>Stop</button>
+<div class="progress-bar"><div class="progress-fill" id="progress"></div></div>
+<div class="status" id="status">Ready</div>
+</div>
+
+<!-- Visualization Panel -->
+<div class="panel viz-panel">
+<div class="hex-grid">
+<canvas id="c0" width="340" height="340"></canvas>
+<canvas id="c1" width="340" height="340"></canvas>
+<canvas id="c2" width="340" height="340"></canvas>
+<canvas id="c3" width="340" height="340"></canvas>
+</div>
+</div>
+
+<!-- Audio Panel -->
+<div class="panel controls-panel">
+<div class="group">
+<div class="group-title">Audio</div>
+<label>Speed multiplier <span class="val" id="v-audiospeed">1.0</span></label>
+<input type="range" id="audiospeed" min="0.1" max="100" step="0.1" value="1.0">
+<label>Max duration (s) <span class="val" id="v-maxdur">60</span></label>
+<input type="range" id="maxdur" min="5" max="300" step="5" value="60">
+<button id="btn-play" class="play" onclick="playAudio()" disabled>Play</button>
+<button id="btn-stop-audio" class="stop" onclick="stopAudio()" disabled>Stop Audio</button>
+<div class="audio-info" id="audio-info"></div>
+</div>
+<div class="group">
+<div class="group-title">Statistics</div>
+<div class="audio-info" id="stats"></div>
+<div style="display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap">
+<button id="btn-dist" onclick="drawDistribution()" disabled style="width:auto;padding:6px 14px">Draw Distribution</button>
+<label style="font-size:.75rem;margin:0">Max pts <input type="number" id="dist-max-pts" value="100000" min="1000" step="10000" style="width:70px"></label>
+</div>
+</div>
+</div>
+
+<!-- Motif Frequency Estimation Panel -->
+<div class="panel" style="width:100%;max-width:1200px">
+<div class="group">
+<div class="group-title">Motif Frequency Estimation</div>
+
+<!-- 2-motif sub-panel -->
+<div style="border:1px solid #2a4a7a;border-radius:8px;overflow:hidden;margin-bottom:12px">
+  <div style="background:#0d2040;padding:10px 16px;cursor:pointer;display:flex;align-items:center;gap:8px"
+       onclick="this.parentElement.classList.toggle('iso-sub-open')">
+    <span style="color:#c9a96e;font-weight:600;flex:1">Estimation of 2-motifs</span>
+    <span class="iso-sub-toggle" style="color:#888;font-size:1.1rem">▼</span>
+  </div>
+  <div class="iso-sub-body" style="display:none;padding:16px">
+    <div style="margin-bottom:10px;padding:8px 12px;background:#0a1628;border-radius:6px;font-size:.85rem;color:#a0b0c0">
+      Minimum inter-note interval: <strong id="amotif2-min" style="color:#e8d5b7">— (run geodesic first)</strong>
+      <span style="color:#667"> — values of a smaller than this will find no 2-motifs</span>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <label style="font-size:.85rem">a
+        <input type="range" id="amotif2-a" min="0" max="5" step="0.01" value="0.50"
+          oninput="document.getElementById('amotif2-v-a').textContent=parseFloat(this.value).toFixed(2)"
+          style="width:120px">
+        <span class="val" id="amotif2-v-a">0.50</span>
+      </label>
+      <label style="font-size:.85rem">ε
+        <input type="range" id="amotif2-eps" min="0" max="0.5" step="0.001" value="0.050"
+          oninput="document.getElementById('amotif2-v-eps').textContent=parseFloat(this.value).toFixed(3)"
+          style="width:120px">
+        <span class="val" id="amotif2-v-eps">0.050</span>
+      </label>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <label style="font-size:.85rem">Note 1
+        <select id="amotif2-n1" style="margin-left:4px;background:#0a1628;color:#e8d5b7;border:1px solid #2a4a7a;border-radius:4px;padding:2px 6px">
+          <option value="0">any</option>
+          <option value="1">curve 1</option>
+          <option value="2">curve 2</option>
+          <option value="3">curve 3</option>
+        </select>
+      </label>
+      <label style="font-size:.85rem">Note 2
+        <select id="amotif2-n2" style="margin-left:4px;background:#0a1628;color:#e8d5b7;border:1px solid #2a4a7a;border-radius:4px;padding:2px 6px">
+          <option value="0">any</option>
+          <option value="1">curve 1</option>
+          <option value="2">curve 2</option>
+          <option value="3">curve 3</option>
+        </select>
+      </label>
+      <button id="btn-amotif2" onclick="runAppMotif2()" disabled style="width:auto;padding:6px 14px">Run 2-Motif Scan</button>
+    </div>
+    <div class="status" id="amotif2-status">Run geodesic first.</div>
+    <div id="amotif2-results" style="display:none;margin-top:10px;font-size:.85rem;color:#ccc;padding:10px;background:#0a0a1a;border-radius:6px;border:1px solid #0f3460"></div>
+    <div id="amotif2-plot-wrap" style="display:none;margin-top:12px">
+      <canvas id="amotif2-canvas" width="900" height="240"
+        style="width:100%;height:auto;background:#0a0a1a;border-radius:6px;border:1px solid #0f3460;display:block"></canvas>
+    </div>
+  </div>
+</div>
+
+<!-- 3-motif sub-panel -->
+<div style="border:1px solid #2a4a7a;border-radius:8px;overflow:hidden">
+  <div style="background:#0d2040;padding:10px 16px;cursor:pointer;display:flex;align-items:center;gap:8px"
+       onclick="this.parentElement.classList.toggle('iso-sub-open')">
+    <span style="color:#c9a96e;font-weight:600;flex:1">Estimation of 3-motifs</span>
+    <span class="iso-sub-toggle" style="color:#888;font-size:1.1rem">▼</span>
+  </div>
+  <div class="iso-sub-body" style="display:none;padding:16px">
+    <div style="margin-bottom:10px;padding:8px 12px;background:#0a1628;border-radius:6px;font-size:.85rem;color:#a0b0c0">
+      Minimum inter-note interval: <strong id="amotif3-min" style="color:#e8d5b7">— (run geodesic first)</strong>
+      <span style="color:#667"> — values of a or b smaller than this will find no 3-motifs</span>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <label style="font-size:.85rem">a
+        <input type="range" id="amotif3-a" min="0" max="5" step="0.01" value="0.50"
+          oninput="document.getElementById('amotif3-v-a').textContent=parseFloat(this.value).toFixed(2)"
+          style="width:120px">
+        <span class="val" id="amotif3-v-a">0.50</span>
+      </label>
+      <label style="font-size:.85rem">b
+        <input type="range" id="amotif3-b" min="0" max="5" step="0.01" value="0.50"
+          oninput="document.getElementById('amotif3-v-b').textContent=parseFloat(this.value).toFixed(2)"
+          style="width:120px">
+        <span class="val" id="amotif3-v-b">0.50</span>
+      </label>
+      <label style="font-size:.85rem">ε
+        <input type="range" id="amotif3-eps" min="0" max="0.5" step="0.001" value="0.050"
+          oninput="document.getElementById('amotif3-v-eps').textContent=parseFloat(this.value).toFixed(3)"
+          style="width:120px">
+        <span class="val" id="amotif3-v-eps">0.050</span>
+      </label>
+    </div>
+    <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      <label style="font-size:.85rem">Note 1
+        <select id="amotif3-n1" style="margin-left:4px;background:#0a1628;color:#e8d5b7;border:1px solid #2a4a7a;border-radius:4px;padding:2px 6px">
+          <option value="0">any</option>
+          <option value="1">curve 1</option>
+          <option value="2">curve 2</option>
+          <option value="3">curve 3</option>
+        </select>
+      </label>
+      <label style="font-size:.85rem">Note 2
+        <select id="amotif3-n2" style="margin-left:4px;background:#0a1628;color:#e8d5b7;border:1px solid #2a4a7a;border-radius:4px;padding:2px 6px">
+          <option value="0">any</option>
+          <option value="1">curve 1</option>
+          <option value="2">curve 2</option>
+          <option value="3">curve 3</option>
+        </select>
+      </label>
+      <label style="font-size:.85rem">Note 3
+        <select id="amotif3-n3" style="margin-left:4px;background:#0a1628;color:#e8d5b7;border:1px solid #2a4a7a;border-radius:4px;padding:2px 6px">
+          <option value="0">any</option>
+          <option value="1">curve 1</option>
+          <option value="2">curve 2</option>
+          <option value="3">curve 3</option>
+        </select>
+      </label>
+      <button id="btn-amotif3" onclick="runAppMotif3()" disabled style="width:auto;padding:6px 14px">Run 3-Motif Scan</button>
+    </div>
+    <div class="status" id="amotif3-status">Run geodesic first.</div>
+    <div id="amotif3-results" style="display:none;margin-top:10px;font-size:.85rem;color:#ccc;padding:10px;background:#0a0a1a;border-radius:6px;border:1px solid #0f3460"></div>
+    <div id="amotif3-plot-wrap" style="display:none;margin-top:12px">
+      <canvas id="amotif3-canvas" width="900" height="240"
+        style="width:100%;height:auto;background:#0a0a1a;border-radius:6px;border:1px solid #0f3460;display:block"></canvas>
+    </div>
+  </div>
+</div>
+
+</div>
+</div>
+
+<!-- Orthospectrum Panel (Monte Carlo) -->
+<div class="panel" style="width:100%;max-width:1200px">
+<div class="group">
+<div class="group-title">Orthospectrum Estimation (Monte Carlo)</div>
+<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">
+<div style="flex:0 0 auto">
+<label>Sample points <select id="orth-samples" style="width:100px">
+<option value="500000">500k</option>
+<option value="1000000" selected>1M</option>
+<option value="2000000">2M</option>
+</select></label>
+</div>
+<div style="flex:0 0 auto">
+<button id="btn-orth" onclick="computeNextOrthElement()" disabled style="width:auto;padding:6px 14px">Estimate Next Element</button>
+</div>
+<div style="flex:0 0 auto">
+<button onclick="resetOrth()" style="width:auto;padding:6px 14px">Reset</button>
+</div>
+<div style="flex:0 0 auto">
+<button id="btn-guess-sep" onclick="guessSepNonsep()" disabled style="width:auto;padding:6px 14px">Guess sep/nonsep</button>
+</div>
+</div>
+<div class="status" id="orth-status">Run geodesic first.</div>
+<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+<div style="flex:1;min-width:200px">
+<table class="orth-table" id="orth-table">
+<thead><tr><th>#</th><th>Length</th><th>Prob %</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<div style="flex:2;min-width:300px">
+<svg id="cdf-svg" class="cdf-canvas" viewBox="0 0 600 250" preserveAspectRatio="xMidYMid meet" style="width:100%;height:auto;min-height:250px"></svg>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Orthospectrum from Arcs (Combinatorially Inequivalent) -->
+<div class="panel" style="width:100%;max-width:1200px">
+<div class="group">
+<div class="group-title">Orthospectrum from Arcs (Combinatorially Inequivalent)</div>
+<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">
+<div style="flex:0 0 auto">
+<button id="btn-homotopy" onclick="computeHomotopyOrthospectrum()" disabled style="width:auto;padding:6px 14px">Compute Orthospectrum</button>
+</div>
+<div style="flex:0 0 auto">
+<button onclick="resetHomotopy()" style="width:auto;padding:6px 14px">Reset</button>
+</div>
+</div>
+<div class="status" id="homotopy-status">Run geodesic first.</div>
+<div style="flex:1;min-width:200px;margin-top:8px">
+<table class="orth-table" id="homotopy-table">
+<thead><tr><th>#</th><th>Length</th><th>Count</th><th>Sequence</th></tr></thead>
+<tbody></tbody>
+</table>
+</div>
+</div>
+</div>
+
+<!-- Saved Arcs Panel -->
+<div class="panel" id="arcs-panel" style="width:100%;max-width:1200px;display:none">
+<div class="group">
+<div class="group-title">Saved Arcs (Short Geodesics)</div>
+<div style="display:flex;gap:12px;flex-wrap:wrap;align-items:end">
+<div style="flex:0 0 auto">
+<label>Table filters:</label>
+<label>Length <input type="number" id="arc-draw-lmin" value="0" step="0.1" style="width:55px"> – <input type="number" id="arc-draw-lmax" value="999999" step="0.1" style="width:55px"></label>
+</div>
+<div style="flex:0 0 auto">
+<label>Init angle <input type="number" id="arc-draw-iamin" value="1.54" step="0.01" style="width:55px"> – <input type="number" id="arc-draw-iamax" value="1.60" step="0.01" style="width:55px"></label>
+</div>
+<div style="flex:0 0 auto">
+<label>Final angle <input type="number" id="arc-draw-famin" value="1.54" step="0.01" style="width:55px"> – <input type="number" id="arc-draw-famax" value="1.60" step="0.01" style="width:55px"></label>
+</div>
+<div style="flex:0 0 auto">
+<button onclick="filterArcsTable()" style="width:auto;padding:6px 14px">Filter</button>
+<button onclick="resetArcsFilter()" style="width:auto;padding:6px 14px">Show All</button>
+<button onclick="drawFilteredArcsOnMain()" style="width:auto;padding:6px 14px">Draw on Main</button>
+</div>
+<div style="flex:0 0 auto">
+<div class="checkbox-row"><input type="checkbox" id="arcs-one-per-class" onchange="updateArcsPanel()"><label for="arcs-one-per-class">One per class</label></div>
+</div>
+</div>
+<div class="status" id="arcs-status" style="margin-top:4px"></div>
+<div style="display:flex;gap:12px;margin-top:6px">
+<div style="flex:1;min-width:200px;max-height:340px;overflow-y:auto">
+<table class="orth-table" id="arcs-table">
+<thead><tr>
+<th style="cursor:pointer" onclick="sortArcsTable('idx')">#</th>
+<th style="cursor:pointer" onclick="sortArcsTable('length')">Length ↕</th>
+<th style="cursor:pointer" onclick="sortArcsTable('initAngle')">Init ∠ ↕</th>
+<th style="cursor:pointer" onclick="sortArcsTable('finalAngle')">Final ∠ ↕</th>
+<th style="cursor:pointer" onclick="sortArcsTable('polyIdx')">Hex ↕</th>
+<th style="cursor:pointer" onclick="sortArcsTable('classIdx')">Class ↕</th>
+</tr></thead>
+<tbody></tbody>
+</table>
+</div>
+<div style="flex:0 0 auto;position:relative;overflow:hidden;border-radius:6px">
+<div id="arc-mini-container" style="display:grid;grid-template-columns:1fr 1fr;gap:2px;transform-origin:center center">
+<canvas id="arc-c0" width="170" height="170" style="background:#0a0a1a;border-radius:4px;border:1px solid #0f3460"></canvas>
+<canvas id="arc-c1" width="170" height="170" style="background:#0a0a1a;border-radius:4px;border:1px solid #0f3460"></canvas>
+<canvas id="arc-c2" width="170" height="170" style="background:#0a0a1a;border-radius:4px;border:1px solid #0f3460"></canvas>
+<canvas id="arc-c3" width="170" height="170" style="background:#0a0a1a;border-radius:4px;border:1px solid #0f3460"></canvas>
+</div>
+<div style="font-size:.65rem;color:#666;text-align:center;margin-top:2px">Scroll to zoom, drag to pan, dblclick to reset</div>
+</div>
+</div>
+</div>
+</div>
+
+<!-- Distribution Panel -->
+<div class="panel" id="dist-panel" style="width:100%;max-width:1200px;display:none">
+<div class="group">
+<div class="group-title">Intersection Distribution (Curve 1)</div>
+<canvas id="dist-canvas" class="cdf-canvas" width="1200" height="800" style="width:100%;height:auto"></canvas>
+<div class="status" id="dist-status"></div>
+</div>
+</div>
+
+</div>
+
+<script src="js/geometry.js"></script>
+<script src="js/hexagons.js"></script>
+<script src="js/geodesic.js"></script>
+<script src="js/drawing.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/computation.js?v=2"></script>
+<script src="js/orthospectrum.js?v=3"></script>
+<script src="js/arcs.js"></script>
+<script src="js/distribution.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/motifs.js"></script>
+<script src="js/ui.js"></script>
+<script>
+"use strict";
+// ===== Motif Frequency Estimation =====
+// Override finish() to enable motif buttons when music data is ready
+const _origFinishMotif = finish;
+finish = function() {
+  _origFinishMotif();
+  const hasData = toMusic && toMusic.length > 0;
+  document.getElementById('btn-amotif2').disabled = !hasData;
+  document.getElementById('btn-amotif3').disabled = !hasData;
+  if (hasData) {
+    const minStr = motifMinInterval(toMusic).toFixed(4);
+    document.getElementById('amotif2-min').textContent = minStr;
+    document.getElementById('amotif3-min').textContent = minStr;
+    document.getElementById('amotif2-status').textContent = 'Ready.';
+    document.getElementById('amotif3-status').textContent = 'Ready.';
+  }
+};
+
+function _appMotifResultsHtml(label, result, noteCount) {
+  return `<strong style="color:#c9a96e">${label}</strong><br>
+    <table style="border-collapse:collapse;width:100%;font-family:monospace;font-size:.85rem;margin-top:6px">
+      <tr style="color:#a0b8d0;border-bottom:1px solid #1e3060">
+        <th style="text-align:left;padding:3px 6px">Metric</th>
+        <th style="text-align:right;padding:3px 6px">Value</th>
+      </tr>
+      <tr style="color:#e8d5b7">
+        <td style="padding:3px 6px">Total geodesic length</td>
+        <td style="text-align:right;padding:3px 6px">${result.totalDist.toFixed(1)}</td>
+      </tr>
+      <tr style="color:#e8d5b7">
+        <td style="padding:3px 6px">Note count</td>
+        <td style="text-align:right;padding:3px 6px">${noteCount.toLocaleString()}</td>
+      </tr>
+      <tr style="color:#e8d5b7">
+        <td style="padding:3px 6px">Motif count</td>
+        <td style="text-align:right;padding:3px 6px">${result.count.toLocaleString()}</td>
+      </tr>
+      <tr style="color:#e8d5b7">
+        <td style="padding:3px 6px">Frequency (per unit length)</td>
+        <td style="text-align:right;padding:3px 6px">${result.freq.toExponential(4)}</td>
+      </tr>
+    </table>`;
+}
+
+function _noteLabel(v) { return v === 0 ? 'any' : `c${v}`; }
+
+function runAppMotif2() {
+  if (!toMusic || toMusic.length === 0) return;
+  const a    = parseFloat(document.getElementById('amotif2-a').value);
+  const eps  = parseFloat(document.getElementById('amotif2-eps').value);
+  const note1 = parseInt(document.getElementById('amotif2-n1').value);
+  const note2 = parseInt(document.getElementById('amotif2-n2').value);
+  document.getElementById('amotif2-status').textContent = 'Scanning…';
+  const result = scanMotif2(toMusic, a, eps, 500, note1, note2);
+  document.getElementById('amotif2-status').textContent = 'Done.';
+  const res = document.getElementById('amotif2-results');
+  res.style.display = '';
+  res.innerHTML = _appMotifResultsHtml(
+    `2-Motif: a=${a.toFixed(2)}, ε=${eps.toFixed(3)}, notes=[${_noteLabel(note1)},${_noteLabel(note2)}]`,
+    result, toMusic.length);
+  document.getElementById('amotif2-plot-wrap').style.display = '';
+  drawMotifFreqGraph('amotif2-canvas', [{ samples: result.samples, color: '#c9a96e' }]);
+}
+
+function runAppMotif3() {
+  if (!toMusic || toMusic.length === 0) return;
+  const a    = parseFloat(document.getElementById('amotif3-a').value);
+  const b    = parseFloat(document.getElementById('amotif3-b').value);
+  const eps  = parseFloat(document.getElementById('amotif3-eps').value);
+  const note1 = parseInt(document.getElementById('amotif3-n1').value);
+  const note2 = parseInt(document.getElementById('amotif3-n2').value);
+  const note3 = parseInt(document.getElementById('amotif3-n3').value);
+  document.getElementById('amotif3-status').textContent = 'Scanning…';
+  const result = scanMotif3(toMusic, a, b, eps, 500, note1, note2, note3);
+  document.getElementById('amotif3-status').textContent = 'Done.';
+  const res = document.getElementById('amotif3-results');
+  res.style.display = '';
+  res.innerHTML = _appMotifResultsHtml(
+    `3-Motif: a=${a.toFixed(2)}, b=${b.toFixed(2)}, ε=${eps.toFixed(3)}, notes=[${_noteLabel(note1)},${_noteLabel(note2)},${_noteLabel(note3)}]`,
+    result, toMusic.length);
+  document.getElementById('amotif3-plot-wrap').style.display = '';
+  drawMotifFreqGraph('amotif3-canvas', [{ samples: result.samples, color: '#ff7744' }]);
+}
+</script>
+</body>
+</html>

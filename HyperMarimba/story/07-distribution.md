@@ -1,0 +1,1 @@
+While calculating a random melody for the given marimba, we recorded the position and direction (angle) in which the geodesic intersected curve 1. In this figure you see a heat map representing a point on the curve (horizontal position), a direction for the vector (vertical position) and the time it takes from there to the next curve.

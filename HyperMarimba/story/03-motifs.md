@@ -1,0 +1,4 @@
+To get an acceptable numerical approximation one needs pretty long geodesics. Press **Run** above to compute a geodesic (default length 250,000) on the surface determined in Panel 1. You can adjust the surface parameters and geodesic length via the **Surface parameters** toggle next to the button.
+
+Having gathered this data, you can estimate the _frequencies_ for _motifs_ consisting of 2 and 3 notes. You can pick freely the _motif_, that is the _notes_ being played, the _gap_ between them, as well as how much  _tolarance_ you allow in the gap. If you set the _tolerance_ to $0$, then the _frequency_ is $0$. Similarly if you set the _gap_ too small. This is so because there is a lower bound for the length of arcs between the components of $\Gamma$. In any case, picking _motifs_ by random often results in the _frequency_ being $0$. Pressing the buttons 1-10 you get existing _motifs_, namely the first ones in the melody.
+
