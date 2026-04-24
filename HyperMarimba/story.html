@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>HyperMarimba</title>
 <link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="story/chat.css">
 <!-- Markdown rendering -->
 <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <!-- Math rendering -->
@@ -466,6 +467,11 @@ body { align-items: stretch; }
             <label>T2% <input type="number" id="geo-motif-t2" min="0" max="100" step="0.5" value="0" onchange="syncGeoParam(this,'t2')"></label>
             <label>T3% <input type="number" id="geo-motif-t3" min="0" max="100" step="0.5" value="0" onchange="syncGeoParam(this,'t3')"></label>
             <label>Length <input type="number" id="geo-motif-maxlen" class="geo-input-length" min="1000" max="10000000" step="1000" value="250000"></label>
+            <label style="display:flex;gap:8px;align-items:center">Curves
+              <span><input type="checkbox" id="geo-motif-curve1" checked onchange="syncGeoCurve(this,1)"> C1</span>
+              <span><input type="checkbox" id="geo-motif-curve2" checked onchange="syncGeoCurve(this,2)"> C2</span>
+              <span><input type="checkbox" id="geo-motif-curve3" checked onchange="syncGeoCurve(this,3)"> C3</span>
+            </label>
             <div class="geo-range-info" id="geo-range-info-motif"></div>
           </div>
         </div>
@@ -1014,12 +1020,12 @@ body { align-items: stretch; }
           </div>
 
           <div style="margin-top:16px">
-            <div style="font-size:.75rem;color:#a0a0c0;margin-bottom:4px">Point symmetry error — linear scale, t ∈ [0, 50]</div>
+            <div style="font-size:.75rem;color:#a0a0c0;margin-bottom:4px">Error — linear scale, t ∈ [0, 50]</div>
             <canvas id="iso2-plot-pt-lin" width="900" height="220" style="width:100%;height:auto;background:#0a0a1a;border-radius:6px;border:1px solid #0f3460;display:block"></canvas>
           </div>
 
           <div style="margin-top:12px">
-            <div style="font-size:.75rem;color:#a0a0c0;margin-bottom:4px">Point symmetry error — log scale, t ∈ [0, 50]</div>
+            <div style="font-size:.75rem;color:#a0a0c0;margin-bottom:4px">Error — log scale, t ∈ [0, 50]</div>
             <canvas id="iso2-plot-pt" width="900" height="220" style="width:100%;height:auto;background:#0a0a1a;border-radius:6px;border:1px solid #0f3460;display:block"></canvas>
           </div>
         </div>
@@ -1038,8 +1044,8 @@ body { align-items: stretch; }
 
           <div class="group-title" style="margin-bottom:8px">Step 1 — Compute Geodesics</div>
           <div class="controls-group" style="margin-bottom:10px">
-            <label>Max length <span class="val" id="iso3-v-maxlen">1.0M</span></label>
-            <input type="range" id="iso3-maxlen-slider" min="0" max="100" step="1" value="0">
+            <label>Max length <span class="val" id="iso3-v-maxlen">500k</span></label>
+            <input type="range" id="iso3-maxlen-slider" min="0" max="100" step="1" value="50">
           </div>
           <div class="controls-actions">
             <button id="iso3-btn-geo" onclick="runIso3Geodesics()">Run Both Geodesics</button>
@@ -1108,7 +1114,7 @@ body { align-items: stretch; }
   </div>
   <div class="step-body">
     <div class="step-content" style="padding-bottom:12px">
-      <p style="margin:0 0 12px">To improve the precision of this step, we need to run again the computation of a random geodesic; this time for even more time.</p>
+      <p style="margin:0 0 12px">To improve the precision of this step, we need to run again the computation of a random geodesic; this time even longer.</p>
       <!-- Run geodesic for this panel -->
       <div class="geo-run-row" style="margin-bottom:0">
       <div class="geo-btn-group">
@@ -1128,6 +1134,11 @@ body { align-items: stretch; }
           <label>T2% <input type="number" id="geo-orth-t2" min="0" max="100" step="0.5" value="0" onchange="syncGeoParam(this,'t2')"></label>
           <label>T3% <input type="number" id="geo-orth-t3" min="0" max="100" step="0.5" value="0" onchange="syncGeoParam(this,'t3')"></label>
           <label>Length <input type="number" id="geo-orth-maxlen" class="geo-input-length" min="1000" max="10000000" step="1000" value="5000000"></label>
+          <label style="display:flex;gap:8px;align-items:center">Curves
+            <span><input type="checkbox" id="geo-orth-curve1" checked onchange="syncGeoCurve(this,1)"> C1</span>
+            <span><input type="checkbox" id="geo-orth-curve2" checked onchange="syncGeoCurve(this,2)"> C2</span>
+            <span><input type="checkbox" id="geo-orth-curve3" checked onchange="syncGeoCurve(this,3)"> C3</span>
+          </label>
           <div class="geo-range-info" id="geo-range-info-orth"></div>
         </div>
       </div>
@@ -1160,8 +1171,6 @@ body { align-items: stretch; }
       </div>
       <div class="controls-actions">
         <button id="btn-orth" onclick="computeNextOrthElement()" disabled>Estimate Next Element</button>
-        <button onclick="resetOrth()">Reset</button>
-        <button id="btn-guess-sep" onclick="guessSepNonsep()" disabled>Guess sep/nonsep</button>
         <button onclick="showOrthInitialSum()">Show initial + sum</button>
       </div>
       <div class="status" id="orth-status">Run geodesic first.</div>
@@ -1195,6 +1204,40 @@ body { align-items: stretch; }
   <div class="step-body">
     <div class="step-content" id="content-4"></div>
     <div class="step-controls">
+
+      <!-- Run geodesic for this panel -->
+      <div class="geo-run-row">
+        <div class="geo-btn-group">
+          <button id="btn-geo-dist" onclick="runPanelGeodesic('dist')">Run</button>
+          <button id="btn-geo-dist-stop" class="stop" onclick="stopPanelGeodesic('dist')" disabled>Stop</button>
+        </div>
+        <div class="geo-settings-box" id="geo-settings-dist" onclick="if(event.target===this||event.target.closest('.geo-settings-header'))this.classList.toggle('geo-open')">
+          <div class="geo-settings-header">
+            Surface parameters <span class="iso-sub-toggle" style="font-size:.9rem">▼</span>
+          </div>
+          <div class="geo-settings-body" onclick="event.stopPropagation()">
+            <label>Type <select id="geo-dist-gluing" onchange="syncGeoParam(this,'gluing-type')"><option value="separating">Sep</option><option value="nonseparating">Nonsep</option></select></label>
+            <label>L1 <input type="number" id="geo-dist-l1" min="1" max="7" step="0.01" value="2.00" onchange="syncGeoParam(this,'l1')"></label>
+            <label>L2 <input type="number" id="geo-dist-l2" min="1" max="7" step="0.01" value="3.00" onchange="syncGeoParam(this,'l2')"></label>
+            <label>L3 <input type="number" id="geo-dist-l3" min="1" max="7" step="0.01" value="4.00" onchange="syncGeoParam(this,'l3')"></label>
+            <label>T1% <input type="number" id="geo-dist-t1" min="0" max="100" step="0.5" value="0" onchange="syncGeoParam(this,'t1')"></label>
+            <label>T2% <input type="number" id="geo-dist-t2" min="0" max="100" step="0.5" value="0" onchange="syncGeoParam(this,'t2')"></label>
+            <label>T3% <input type="number" id="geo-dist-t3" min="0" max="100" step="0.5" value="0" onchange="syncGeoParam(this,'t3')"></label>
+            <label>Length <input type="number" id="geo-dist-maxlen" class="geo-input-length" min="1000" max="10000000" step="1000" value="500000"></label>
+            <label style="display:flex;gap:8px;align-items:center">Curves
+              <span><input type="checkbox" id="geo-dist-curve1" checked onchange="syncGeoCurve(this,1)"> C1</span>
+              <span><input type="checkbox" id="geo-dist-curve2" checked onchange="syncGeoCurve(this,2)"> C2</span>
+              <span><input type="checkbox" id="geo-dist-curve3" checked onchange="syncGeoCurve(this,3)"> C3</span>
+            </label>
+            <div class="geo-range-info" id="geo-range-info-dist"></div>
+          </div>
+        </div>
+        <div class="geo-progress-line">
+          <div class="progress-bar"><div class="progress-fill" id="geo-progress-dist"></div></div>
+          <span class="status" id="geo-status-dist">Ready</span>
+        </div>
+      </div>
+
       <div class="controls-row">
         <div class="controls-group">
           <label style="font-size:.8rem">Max points <input type="number" id="dist-max-pts" value="100000" min="1000" step="10000" style="width:80px"></label>
@@ -1301,6 +1344,7 @@ body { align-items: stretch; }
 <script src="js/distribution.js"></script>
 <script src="js/charts.js"></script>
 <script src="js/motifs.js"></script>
+<script src="story/chat.js"></script>
 
 <script>
 "use strict";
@@ -1400,7 +1444,6 @@ function unlockGeodesicSteps() {
   for (let i = 4; i <= 5; i++) unlockStep(i);
   unlockStep('motif');
   document.getElementById('btn-orth').disabled = false;
-  document.getElementById('btn-guess-sep').disabled = false;
   // Populate min interval displays now that toMusic is available
   if (toMusic && toMusic.length > 0) {
     const minStr = motifMinInterval(toMusic).toFixed(4);
@@ -2278,7 +2321,7 @@ let cmp2AMusicFull = null;
 let cmp2BMusicFull = null;
 
 function iso3GeolenFromSlider(v) {
-  return Math.round(1e6 * Math.pow(10, v / 100));
+  return Math.round(250000 * Math.pow(4, v / 100));
 }
 function iso3GeolenFmt(v) {
   const n = iso3GeolenFromSlider(v);
@@ -3819,7 +3862,7 @@ function _surf3dDrawCurves(ctx) {
 
 // Parameter IDs that are synced between panel 1 sliders and panel sub-inputs
 const _geoParamIds = ['l1','l2','l3','t1','t2','t3'];
-const _geoPanelPrefixes = ['motif','orth'];
+const _geoPanelPrefixes = ['motif','orth','dist'];
 
 // Sync: when a sub-panel input changes, push to panel-1 slider + all other sub-panels
 // Range limits for validated parameters
@@ -3879,7 +3922,20 @@ function syncGeoParam(srcEl, mainId) {
   if (typeof buildSurface === 'function') buildSurface();
 }
 
-// Sync: when panel-1 sliders change, push to all sub-panel inputs
+function syncGeoCurve(srcEl, curveNum) {
+  const checked = srcEl.checked;
+  // sync to panel-1
+  const mainEl = document.getElementById('curve' + curveNum + '-active');
+  if (mainEl && mainEl !== srcEl) mainEl.checked = checked;
+  // sync to all other sub-panels
+  for (const pfx of _geoPanelPrefixes) {
+    const el = document.getElementById('geo-' + pfx + '-curve' + curveNum);
+    if (el && el !== srcEl) el.checked = checked;
+  }
+  if (typeof buildSurface === 'function') buildSurface();
+}
+
+// Sync: when panel-1 sliders/checkboxes change, push to all sub-panel inputs
 function _syncFromPanel1() {
   const gluingVal = document.getElementById('gluing-type').value;
   for (const pfx of _geoPanelPrefixes) {
@@ -3890,6 +3946,11 @@ function _syncFromPanel1() {
       const dst = document.getElementById('geo-' + pfx + '-' + id);
       if (src && dst) dst.value = src.value;
     }
+    for (let c = 1; c <= 3; c++) {
+      const src = document.getElementById('curve' + c + '-active');
+      const dst = document.getElementById('geo-' + pfx + '-curve' + c);
+      if (src && dst) dst.checked = src.checked;
+    }
   }
 }
 // Hook into panel-1 slider input events
@@ -3898,6 +3959,10 @@ for (const id of _geoParamIds) {
   if (el) el.addEventListener('input', _syncFromPanel1);
 }
 document.getElementById('gluing-type').addEventListener('change', _syncFromPanel1);
+for (let c = 1; c <= 3; c++) {
+  const el = document.getElementById('curve' + c + '-active');
+  if (el) el.addEventListener('change', _syncFromPanel1);
+}
 
 // Per-panel stop flags
 var _panelGeoStop = {};
@@ -3962,9 +4027,11 @@ async function runPanelGeodesic(prefix) {
     status.textContent = 'Stopped.'; return;
   }
 
-  const curveCombinations = gluing.curveCombinations.map((cc, i) =>
-    document.getElementById('curve' + (i + 1) + '-active').checked ? cc : [[-1, -1]]
-  );
+  const curveCombinations = gluing.curveCombinations.map((cc, i) => {
+    const subEl = document.getElementById('geo-' + prefix + '-curve' + (i + 1));
+    const mainEl = document.getElementById('curve' + (i + 1) + '-active');
+    return (subEl ? subEl : mainEl).checked ? cc : [[-1, -1]];
+  });
 
   status.textContent = 'Computing...';
   const toMusicLocal = [];
@@ -4061,6 +4128,7 @@ async function runPanelGeodesic(prefix) {
       );
     }
 
+    resetOrth();
     unlockGeodesicSteps();
   } else {
     status.textContent = _panelGeoStop[prefix] ? 'Stopped.' : 'No data generated.';
@@ -4256,6 +4324,7 @@ function _finishGeodesicSave(music, totalDist, distLocal, arcLengths) {
     document.getElementById('viz-geodesic-panel').classList.remove('substep-locked');
     document.getElementById('listen-music-panel').classList.remove('substep-locked');
     storyPlayer.setMusic(music);
+    resetOrth();
     unlockGeodesicSteps();
   } else {
     document.getElementById('status').textContent = storySaveStop ? 'Stopped.' : 'No data generated.';

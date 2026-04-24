@@ -11,11 +11,20 @@ function svgCdfSetup(xMax,yMin,yMax){
 
 function svgPolylinePoints(x,f,tx,ty,xMax,yMin,yMax){
   let pts='';
+  let lastF=null;
   for(let i=0;i<x.length;i++){
     if(!isFinite(x[i])||!isFinite(f[i]))continue;
-    const sx=tx(Math.min(x[i],xMax));
+    if(x[i]>xMax)break;
+    const sx=tx(x[i]);
     const sy=ty(Math.max(yMin,Math.min(yMax,f[i])));
     pts+=(pts?',':'')+sx.toFixed(3)+','+sy.toFixed(3);
+    lastF=f[i];
+  }
+  // Extend horizontally to xMax with the last value
+  if(lastF!==null){
+    const sx=tx(xMax);
+    const sy=ty(Math.max(yMin,Math.min(yMax,lastF)));
+    pts+=','+sx.toFixed(3)+','+sy.toFixed(3);
   }
   return pts;
 }

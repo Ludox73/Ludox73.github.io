@@ -119,7 +119,7 @@ function drawThetaDistribution(D){
   const pw=W-pad.l-pad.r,ph=H-pad.t-pad.b;
 
   const tMin=-Math.PI,tMax=Math.PI;
-  const nBins=80;
+  const nBins=100;
   const binW=(tMax-tMin)/nBins;
 
   // Build histogram

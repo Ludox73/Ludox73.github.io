@@ -14,14 +14,6 @@ In "Intersection distribution" one needs a button to generate the geodesic.
 
 --------------------------------------
 
-TODO:
-remove per arcs saved and second line
-Listen to melody (not music)
-
-Write Marimba A and Marimba B . What is Playback? Listen to melody
-
-Disable Fast mode by default.
-
 Orange to blue in sum CDF
 
 
@@ -43,7 +35,7 @@ Compare two surfaces:
     - Compare motifs: to speed it up, maybe set the length to be 250.000 (or maybe 500.000) instead of a 1.000.000.
 
 Indistinguishable examples
-    - "Point symmetry error" -> "Error"
+    - " " -> "Error"
     - TEXT in Motif Frequency: 
         Given that errors becomes clearly visible when one rans for such a model length like $50$, you might be wondering why do we bother to use lengths like $1.000.000$, and what is the value of our calculations. Well, note that since the errors are really small for relatively long times (length $25$), the curves we describe, while not geodesics are definitively _quasi-geodesics_ which moreover stay extremely close to the geodesic they track. Moreover, if the errors are random, as one probably should suppose them to be, then the so-obtained geodesics are also equidistributed with respect to the Liouville measure. It follows that while we might not be calculating the melody of the vector we start with, we are calculating, with small errors, the melody of some other random vector. 
 
