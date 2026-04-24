@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Motif Detection Test</title></head>
+<body style="background:#111;color:#ccc;font-family:monospace;padding:20px">
+<h2>Motif Detection Test — Real Geodesic</h2>
+<pre id="log" style="white-space:pre-wrap"></pre>
+
+<script src="js/geometry.js"></script>
+<script src="js/hexagons.js"></script>
+<script src="js/geodesic.js"></script>
+<script src="js/motifs.js"></script>
+<script>
+const log = document.getElementById('log');
+function print(s) { log.textContent += s + '\n'; }
+print('=== TEST VERSION 3 — ' + new Date().toISOString() + ' ===\n');
+
+function computeGeodesic(maxLen) {
+  const gluing = createGluingSeparatingS2();
+  const polytopes = buildPolytopes(gluing, [1.5, 1.0, 0.8]);
+  const circles = buildCircles(polytopes);
+  const twists = [0.3, 0.7, 1.2];
+
+  let bx = 0, by = 0;
+  for (let k = 0; k < 6; k++) { bx += polytopes[0][k][0]; by += polytopes[0][k][1]; }
+  bx /= 6; by /= 6;
+  if (Math.abs(bx) < 1e-6 && Math.abs(by) < 1e-6) { bx += 1e-4; by += 1e-4; }
+  const np2 = bx * bx + by * by;
+  const ang = Math.random() * 2 * Math.PI;
+  const tgScale = 20 * (2 / (1 - np2)) ** (-2);
+  let curPoint = [bx, by], curTgVec = [tgScale * Math.sin(ang), tgScale * Math.cos(ang)];
+  let polyIdx = 0, toAvoid = 6;
+
+  let warmup = 0;
+  while (warmup < 500) {
+    const inter = firstIntersection(curPoint, curTgVec, circles[polyIdx], toAvoid);
+    if (!inter) break;
+    warmup += distanceTwoPoints(curPoint, inter.point);
+    const pr = applyPairing(inter.point, inter.tgVec, polyIdx, inter.side, gluing, twists, polytopes);
+    curPoint = pr.point; curTgVec = pr.tgVec; polyIdx = pr.polyIdx; toAvoid = pr.toAvoid;
+  }
+
+  const curveCombinations = gluing.curveCombinations;
+  const music = [];
+  let totalDist = 0, travelledSinceLast = 0, firstCycle = true;
+  while (totalDist < maxLen) {
+    const inter = firstIntersection(curPoint, curTgVec, circles[polyIdx], toAvoid);
+    if (!inter) break;
+    const segDist = distanceTwoPoints(curPoint, inter.point);
+    totalDist += segDist;
+    travelledSinceLast += segDist;
+    for (let ci = 0; ci < curveCombinations.length; ci++) {
+      for (const [pairPoly, pairSide] of curveCombinations[ci]) {
+        if (polyIdx === pairPoly && inter.side === pairSide) {
+          if (!firstCycle) music.push([travelledSinceLast, ci + 1]);
+          travelledSinceLast = 0;
+          firstCycle = false;
+        }
+      }
+    }
+    const pr = applyPairing(inter.point, inter.tgVec, polyIdx, inter.side, gluing, twists, polytopes);
+    curPoint = pr.point; curTgVec = pr.tgVec; polyIdx = pr.polyIdx; toAvoid = pr.toAvoid;
+  }
+  return music;
+}
+
+setTimeout(() => {
+  const music = computeGeodesic(5000);
+  print('Got ' + music.length + ' notes.');
+  const gaps = music.map(m => m[0]).filter(g => g > 0);
+  gaps.sort((a, b) => a - b);
+  print('Gap range: ' + gaps[0].toFixed(4) + ' to ' + gaps[gaps.length - 1].toFixed(4) + '\n');
+
+  // Print first 20 notes
+  print('First 20 notes:');
+  for (let i = 0; i < Math.min(20, music.length); i++) {
+    print('  [' + i + '] gap=' + music[i][0].toFixed(6) + '  curve=' + music[i][1]);
+  }
+  print('');
+
+  let fail2 = 0, total2 = 0, fail3 = 0, total3 = 0;
+
+  // Test 2-motifs: use floored gap directly (no slider)
+  for (let i = 0; i < music.length - 1; i++) {
+    const c1 = music[i][1], c2 = music[i + 1][1];
+    const a = Math.floor(music[i + 1][0] * 100) / 100;
+    const eps = 0.1;
+    const result = scanMotif2(music, a, eps, 10, c1, c2);
+    total2++;
+    if (result.count === 0) {
+      fail2++;
+      const d = music[i + 1][0];
+      print('FAIL 2-motif at note ' + i + ':');
+      print('  gap=' + d.toFixed(8) + '  a(floor)=' + a.toFixed(8) + '  diff=' + (d - a).toExponential(3));
+      print('  d>=a-1e-9? ' + (d >= a - 1e-9) + '  d<=a+eps? ' + (d <= a + eps));
+    }
+  }
+
+  // Test 3-motifs
+  for (let i = 0; i < music.length - 2; i++) {
+    const c1 = music[i][1], c2 = music[i + 1][1], c3 = music[i + 2][1];
+    const a = Math.floor(music[i + 1][0] * 100) / 100;
+    const b = Math.floor(music[i + 2][0] * 100) / 100;
+    const eps = 0.5;
+    const result = scanMotif3(music, a, b, eps, 10, c1, c2, c3);
+    total3++;
+    if (result.count === 0) {
+      fail3++;
+      const d12 = music[i + 1][0], d23 = music[i + 2][0];
+      print('FAIL 3-motif at note ' + i + ':');
+      print('  d12=' + d12.toFixed(8) + '  a=' + a.toFixed(8) + '  diff12=' + (d12 - a).toExponential(3));
+      print('  d23=' + d23.toFixed(8) + '  b=' + b.toFixed(8) + '  diff23=' + (d23 - b).toExponential(3));
+      print('  sum=' + (d12+d23).toFixed(8) + '  a+b=' + (a+b).toFixed(8) + '  diffsum=' + (d12+d23-a-b).toExponential(3));
+    }
+  }
+
+  print('\n=== RESULTS ===');
+  print('2-motif: ' + total2 + ' tests, ' + fail2 + ' failures');
+  print('3-motif: ' + total3 + ' tests, ' + fail3 + ' failures');
+  if (fail2 === 0 && fail3 === 0) print('\nALL PASSED!');
+  else print('\nSOME FAILURES — see above');
+}, 100);
+</script>
+</body>
+</html>

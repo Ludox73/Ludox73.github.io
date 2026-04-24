@@ -36,7 +36,7 @@ function scanMotif2(music, a, eps, nSamples = 500, note1 = 0, note2 = 0) {
   for (let k = 1; k < music.length; k++) {
     cumDist += music[k][0];
     const d = music[k][0];
-    if (d >= a && d <= a + eps &&
+    if (d >= a - 1e-9 && d <= a + eps &&
         (note1 === 0 || music[k - 1][1] === note1) &&
         (note2 === 0 || music[k][1] === note2)) count++;
     while (nextSample <= cumDist && nextSample <= totalDist + 1e-12) {
@@ -67,7 +67,7 @@ function scanMotif3(music, a, b, eps, nSamples = 500, note1 = 0, note2 = 0, note
   for (let k = 2; k < music.length; k++) {
     cumDist += music[k][0];
     const d12 = music[k - 1][0], d23 = music[k][0];
-    if (d12 >= a && d12 <= a + eps && d12 + d23 >= a + b && d12 + d23 <= a + b + eps &&
+    if (d12 >= a - 1e-9 && d12 <= a + eps && d12 + d23 >= a + b - 1e-9 && d12 + d23 <= a + b + eps &&
         (note1 === 0 || music[k - 2][1] === note1) &&
         (note2 === 0 || music[k - 1][1] === note2) &&
         (note3 === 0 || music[k][1] === note3)) count++;
