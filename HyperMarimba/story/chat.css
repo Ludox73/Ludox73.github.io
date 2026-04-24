@@ -3,13 +3,13 @@
   bottom: 28px;
   right: 28px;
   z-index: 1000;
-  width: 128px;
-  height: 128px;
+  width: 96px;
+  height: 96px;
   border-radius: 50%;
   background: #1a3a6a;
   border: 1px solid #2a5a9a;
   color: #c9a96e;
-  font-size: 56px;
+  font-size: 42px;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -23,7 +23,7 @@
 
 #chat-panel {
   position: fixed;
-  bottom: 172px;
+  bottom: 140px;
   right: 28px;
   z-index: 999;
   width: 340px;

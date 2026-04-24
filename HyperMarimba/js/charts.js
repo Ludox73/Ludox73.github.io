@@ -54,11 +54,13 @@ function buildSvgChart(curves,title,cfg){
   }
 
   // Legend
-  const lx=pad.l+pw-160,ly=pad.t+15;
-  curves.forEach((c,i)=>{
-    if(!c.label)return;
-    svg+=`<rect x="${lx}" y="${ly+i*16-4}" width="12" height="3" fill="${c.color}"/>`;
-    svg+=`<text x="${lx+16}" y="${ly+i*16}" fill="#ccc" font-size="11">${c.label}</text>`;
+  const labeled=curves.filter(c=>c.label);
+  const ly=cfg.legendY!==undefined?ty(cfg.legendY):pad.t+15;
+  let lx=pad.l;
+  labeled.forEach(c=>{
+    svg+=`<rect x="${lx}" y="${ly-5}" width="14" height="3" fill="${c.color}"/>`;
+    svg+=`<text x="${lx+18}" y="${ly}" fill="#ccc" font-size="11">${c.label}</text>`;
+    lx+=18+c.label.length*6.2+16;
   });
 
   // Title
@@ -161,6 +163,7 @@ function showOrthInitialSum(){
     return;
   }
   const cfg=svgCdfSetup(15,-0.2,1.0);
+  cfg.legendY=-0.1;
   const MAX_VIZ=1000000;
   const init=downsampleForViz(orthState.xInit,orthState.fInit,MAX_VIZ);
   const curves=[{x:init.x,f:init.f,color:'#cccccc',label:'Initial ECDF'}];
@@ -171,17 +174,23 @@ function showOrthInitialSum(){
     const xSet=new Set();
     for(const s of snaps)for(const v of s.xCand)if(isFinite(v))xSet.add(v);
     const sumX=[...xSet].sort((a,b)=>a-b);
-    const sumF=sumX.map(x=>{
-      let tot=0;
-      for(const snap of snaps){
-        let lo=0,hi=snap.xCand.length-1,best=-1;
-        while(lo<=hi){const mid=(lo+hi)>>1;if(snap.xCand[mid]<=x){best=mid;lo=mid+1;}else hi=mid-1;}
-        if(best>=0)tot+=snap.fCand[best];
-      }
-      return tot;
-    });
-    const sm=downsampleForViz(sumX,sumF,MAX_VIZ);
-    curves.push({x:sm.x,f:sm.f,color:'#ff8844',label:'Sum of computed'});
+
+    function evalSnapAt(snap,x){
+      let lo=0,hi=snap.xCand.length-1,best=-1;
+      while(lo<=hi){const mid=(lo+hi)>>1;if(snap.xCand[mid]<=x){best=mid;lo=mid+1;}else hi=mid-1;}
+      return best>=0?snap.fCand[best]:0;
+    }
+
+    // Partial sums (all but last shown in light orange)
+    const runningF=new Float64Array(sumX.length);
+    for(let k=0;k<snaps.length;k++){
+      for(let j=0;j<sumX.length;j++)runningF[j]+=evalSnapAt(snaps[k],sumX[j]);
+      const isFinal=k===snaps.length-1;
+      const color=isFinal?'#ff8844':'#ffcc99';
+      const label=isFinal?'Sum of computed':k===0?'Partial sums':null;
+      const sm=downsampleForViz(sumX,[...runningF],MAX_VIZ);
+      curves.push({x:sm.x,f:sm.f,color,label});
+    }
   }
 
   const title=`Initial distribution + sum (${snaps.length} element${snaps.length!==1?'s':''})`;
