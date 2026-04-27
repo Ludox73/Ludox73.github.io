@@ -40,3 +40,7 @@ select{background:#0a0a1a;color:#e0e0e0;border:1px solid #0f3460;border-radius:4
 .iso-sub-open .iso-sub-body { display: block !important; }
 .iso-sub-open .iso-sub-toggle { transform: rotate(180deg); }
 .iso-sub-toggle { display: inline-block; transition: transform 0.2s; }
+
+@media (max-width: 600px) {
+  #viz-surface-mini { display: none !important; }
+}

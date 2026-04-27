@@ -12,12 +12,13 @@ Galois: I made the mistake of listening to your marimba, and now I just want to 
 Frege: Don't listen to those guys. Your hyperbolic marimba is a fine example of how mathematics can be both rigorous and melodic! 💯
 Cardano ✔️: My ~~ass~~ great discovery of yours... Look at chapter "Theoria et evolutio Divinae Marimbae Hyperbolicae" in my "Ars Magna"... Have been playing hyperbolic marimba for centuries... 
 Riemann: No one’s ever built a playable non-Euclidean instrument before!
+Pytha87xU9goras ✅: Contact me at metempsychosis510@hottmail.co.tu for my free crypto investing course.
 Chebyshev: @Riemann ‘No one’? How quickly you forget Comrade Lobachevsky’s harmonic balalaika of 1832. Academic Ostrogradsky wrote about this in the proceedings of the XXXVIIIth Krasnodar Conference on Fluid Dynamics and Kleinian Groups in honor of Academic Bunyakovsky. 
 Bunyakovsky: @Chebyshev I was insulted when he did that because it was just a math olympia problem.
 Ostrogradsky: @Bunyakovsky You are wrong. It was a problem I was asked to solve in pre-school, but I though that it was the appropriate level for the occasion. 😈
 Cardano ✔️: Oh burn!
 Tartaglia: @Cardano you know that it was me who discovered it!! I showed you how to build it out of strings spanned on a pigs bladder!!! Tu bugiard, codardo, impostor, ladro di idee di olter gent!!!
-Cardano ✔️: @Tartaglia man chill out... and who are you 🤡? not even verified... lame...
+Cardano ✔️: @Tartaglia man chill out... and who are you 🤡? not even verified... lame... 💤💤
 Nicolas Bourbaki: Allons enfants de la Patrie...
 
 

@@ -947,7 +947,7 @@ body { align-items: stretch; }
 <div class="step" id="step-iso">
   <div class="step-header" onclick="toggleStep('iso')">
     <div class="step-number">4</div>
-    <div class="step-title">Indistinguishable example, separating and nonseparating curve</div>
+    <div class="step-title">Isomelodic example, separating and nonseparating curve</div>
     <div class="step-toggle">▼</div>
   </div>
   <div class="step-body">
@@ -1889,18 +1889,23 @@ function selectMotifFromNote3(i) {
   _setSlider('smotif3-b',   'smotif3-v-b',   b,   2);
   _setSlider('smotif3-eps', 'smotif3-v-eps', 0.5, 3);
 }
+function _fmtFreq(freq) {
+  return (freq * 1000).toFixed(5) + ' ×10\u207B\u00B3';
+}
+
 function _motifResultsHtml(label, result, noteCount) {
-  const pct = (result.freq * 100).toFixed(5);
   return `
     <div style="color:#c9a96e;font-weight:600;margin-bottom:8px">${label}</div>
     <table style="border-collapse:collapse;width:100%;font-family:monospace;font-size:.85rem">
       <tr style="color:#a0b8d0;border-bottom:1px solid #1e3060">
-        <th style="text-align:left;padding:4px 8px">Metric</th>
-        <th style="text-align:right;padding:4px 8px">Value</th>
+        <th style="text-align:right;padding:4px 8px">Motif count</th>
+        <th style="text-align:right;padding:4px 8px">Frequency</th>
+        <!-- <th style="text-align:right;padding:4px 8px">Length of Geodesic</th> -->
       </tr>
       <tr style="color:#e8d5b7">
-        <td style="padding:4px 8px">Frequency (per unit length)</td>
-        <td style="text-align:right;padding:4px 8px">${pct} %</td>
+        <td style="text-align:right;padding:4px 8px">${result.count.toLocaleString()}</td>
+        <td style="text-align:right;padding:4px 8px">${_fmtFreq(result.freq)}</td>
+        <!-- <td style="text-align:right;padding:4px 8px">${result.totalDist.toFixed(1)}</td> -->
       </tr>
     </table>`;
 }
@@ -2166,24 +2171,21 @@ function runCmp2MotifAnalysis() {
     <table style="border-collapse:collapse;width:100%;font-family:monospace;font-size:.85rem">
       <tr style="color:#a0b8d0;border-bottom:1px solid #1e3060">
         <th style="text-align:left;padding:4px 8px"></th>
-        <th style="text-align:right;padding:4px 8px">Length</th>
-        <th style="text-align:right;padding:4px 8px">Notes</th>
         <th style="text-align:right;padding:4px 8px">Motif count</th>
-        <th style="text-align:right;padding:4px 8px">Frequency %</th>
+        <th style="text-align:right;padding:4px 8px">Frequency</th>
+        <!-- <th style="text-align:right;padding:4px 8px">Length of Geodesic</th> -->
       </tr>
       <tr style="color:#e8d5b7">
         <td style="padding:4px 8px">Marimba A</td>
-        <td style="text-align:right;padding:4px 8px">${rA.dist.toFixed(1)}</td>
-        <td style="text-align:right;padding:4px 8px">${musicA.length.toLocaleString()}</td>
         <td style="text-align:right;padding:4px 8px">${rA.count.toLocaleString()}</td>
-        <td style="text-align:right;padding:4px 8px">${(rA.dist > 0 ? (rA.count / rA.dist * 100).toFixed(5) : '0.00000') + ' %'}</td>
+        <td style="text-align:right;padding:4px 8px">${_fmtFreq(rA.dist > 0 ? rA.count / rA.dist : 0)}</td>
+        <!-- <td style="text-align:right;padding:4px 8px">${rA.dist.toFixed(1)}</td> -->
       </tr>
       <tr style="color:#e8d5b7">
         <td style="padding:4px 8px">Marimba B</td>
-        <td style="text-align:right;padding:4px 8px">${rB.dist.toFixed(1)}</td>
-        <td style="text-align:right;padding:4px 8px">${musicB.length.toLocaleString()}</td>
         <td style="text-align:right;padding:4px 8px">${rB.count.toLocaleString()}</td>
-        <td style="text-align:right;padding:4px 8px">${(rB.dist > 0 ? (rB.count / rB.dist * 100).toFixed(5) : '0.00000') + ' %'}</td>
+        <td style="text-align:right;padding:4px 8px">${_fmtFreq(rB.dist > 0 ? rB.count / rB.dist : 0)}</td>
+        <!-- <td style="text-align:right;padding:4px 8px">${rB.dist.toFixed(1)}</td> -->
       </tr>
     </table>`;
 
@@ -2971,15 +2973,8 @@ async function startIsomelodic() {
   document.getElementById('iso-progress').style.width = '100%';
   document.getElementById('iso-status').textContent = `Done.`;
 
-  function statsHtml(music) {
-    const total = music.length;
-    const c1 = music.filter(x => x[1] === 1).length;
-    const c2 = music.filter(x => x[1] === 2).length;
-    const c3 = music.filter(x => x[1] === 3).length;
-    return `Crossings: ${total} &nbsp;|&nbsp; C1: ${c1} &nbsp; C2: ${c2} &nbsp; C3: ${c3}`;
-  }
-  document.getElementById('iso-sep-stats').innerHTML = statsHtml(sepMusic);
-  document.getElementById('iso-non-stats').innerHTML = statsHtml(nonMusic);
+  document.getElementById('iso-sep-stats').innerHTML = '';
+  document.getElementById('iso-non-stats').innerHTML = '';
 
   // Final partiture redraw (properly scaled)
   drawPartiture(sepMusic, nonMusic, null, maxLen);
@@ -3470,24 +3465,21 @@ function runIso3MotifAnalysis() {
     <table style="border-collapse:collapse;width:100%;font-family:monospace;font-size:.85rem">
       <tr style="color:#a0b8d0;border-bottom:1px solid #1e3060">
         <th style="text-align:left;padding:4px 8px"></th>
-        <th style="text-align:right;padding:4px 8px">Length</th>
-        <th style="text-align:right;padding:4px 8px">Notes</th>
         <th style="text-align:right;padding:4px 8px">Motif count</th>
-        <th style="text-align:right;padding:4px 8px">Frequency (per unit length)</th>
+        <th style="text-align:right;padding:4px 8px">Frequency</th>
+        <!-- <th style="text-align:right;padding:4px 8px">Length of Geodesic</th> -->
       </tr>
       <tr style="color:#e8d5b7">
         <td style="padding:4px 8px">Separating</td>
-        <td style="text-align:right;padding:4px 8px">${sepR.dist.toFixed(1)}</td>
-        <td style="text-align:right;padding:4px 8px">${sepMusic.length.toLocaleString()}</td>
         <td style="text-align:right;padding:4px 8px">${sepR.count.toLocaleString()}</td>
-        <td style="text-align:right;padding:4px 8px">${(sepR.dist > 0 ? sepR.count / sepR.dist : 0).toExponential(4)}</td>
+        <td style="text-align:right;padding:4px 8px">${_fmtFreq(sepR.dist > 0 ? sepR.count / sepR.dist : 0)}</td>
+        <!-- <td style="text-align:right;padding:4px 8px">${sepR.dist.toFixed(1)}</td> -->
       </tr>
       <tr style="color:#e8d5b7">
         <td style="padding:4px 8px">Nonseparating</td>
-        <td style="text-align:right;padding:4px 8px">${nonR.dist.toFixed(1)}</td>
-        <td style="text-align:right;padding:4px 8px">${nonMusic.length.toLocaleString()}</td>
         <td style="text-align:right;padding:4px 8px">${nonR.count.toLocaleString()}</td>
-        <td style="text-align:right;padding:4px 8px">${(nonR.dist > 0 ? nonR.count / nonR.dist : 0).toExponential(4)}</td>
+        <td style="text-align:right;padding:4px 8px">${_fmtFreq(nonR.dist > 0 ? nonR.count / nonR.dist : 0)}</td>
+        <!-- <td style="text-align:right;padding:4px 8px">${nonR.dist.toFixed(1)}</td> -->
       </tr>
     </table>
   `;
