@@ -47,7 +47,9 @@
     try {
       const r    = await fetch(DATA_FILE);
       const text = await r.text();
-      const msgs = text.split('\n')
+      const chats = text.split(/\n\s*\n/).filter(c => c.trim());
+      const chat  = chats[Math.floor(Math.random() * chats.length)];
+      const msgs  = chat.split('\n')
         .map(l => l.trim())
         .filter(l => l && !l.startsWith('#'))
         .map(l => {
@@ -66,7 +68,7 @@
           <span class="chat-msg-name">${esc(m.name)}</span>
           <span class="chat-msg-text">${fmt(m.text)}</span>
         </div>`).join('');
-      msgList.scrollTop = msgList.scrollHeight;
+      msgList.scrollTop = 0;
     } catch {
       msgList.innerHTML = '<span class="chat-empty">Could not load messages.</span>';
     }
