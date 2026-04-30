@@ -85,3 +85,17 @@
   font-style: italic;
 }
 #chat-footer a:hover { text-decoration: underline; }
+
+@media (max-width: 768px) {
+  #chat-toggle {
+    width: 24px;
+    height: 24px;
+    font-size: 11px;
+    bottom: 12px;
+    right: 12px;
+  }
+  #chat-panel {
+    bottom: 52px;
+    right: 12px;
+  }
+}
