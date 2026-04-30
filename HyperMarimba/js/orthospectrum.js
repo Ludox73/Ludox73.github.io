@@ -14,7 +14,7 @@ function computeCumufunFromToMusic(tm){
   return myEcdf(values);
 }
 
-// ===== Monte Carlo Orthospectrum =====
+// ===== Orthospectrum =====
 let orthState={initialized:false,xVals:null,fVals:null,lengthGeodesic:0,results:[],percentages:[],snapshots:[]};
 
 function guessLengthGeodesicFromToMusic(tm,chiSigma){
