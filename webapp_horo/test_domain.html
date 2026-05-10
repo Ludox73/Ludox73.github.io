@@ -1,0 +1,720 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Horocyclic Flow — Comprehensive Test Suite</title>
+<style>
+body { font-family: monospace; background: #111; color: #ddd; padding: 20px; }
+h2 { color: #c9a96e; }
+h3 { color: #8af; margin-top: 18px; }
+#log { white-space: pre-wrap; font-size: 0.82rem; line-height: 1.5;
+       background: #1a1a2e; padding: 14px; border-radius: 6px; border: 1px solid #333; }
+.ok  { color: #6c6; }
+.err { color: #f55; }
+.wrn { color: #fa0; }
+.inf { color: #8af; }
+</style>
+</head>
+<body>
+<h2>Horocyclic Flow — Comprehensive Test Suite</h2>
+<div id="log"><span class="inf">Loading…</span></div>
+<script src="../webapp/js/geometry.js"></script>
+<script src="../webapp/js/hexagons.js"></script>
+<script src="../webapp/js/geodesic.js"></script>
+<script>
+const logEl = document.getElementById('log');
+logEl.textContent = '';
+function emit(cls, msg) {
+  const s = document.createElement('span');
+  s.className = cls;
+  s.textContent = msg + '\n';
+  logEl.appendChild(s);
+}
+window.onerror = function(msg, src, line) { emit('err','JS ERROR: '+msg+' (line '+line+')'); };
+
+// ─── Helpers duplicated from horocycle.js ─────────────────────────────────────
+
+function isOnArc(p, v1, v2, c) {
+  const θp  = Math.atan2(p[1]-c[1],  p[0]-c[0]);
+  const θv1 = Math.atan2(v1[1]-c[1], v1[0]-c[0]);
+  const θv2 = Math.atan2(v2[1]-c[1], v2[0]-c[0]);
+  let d12 = θv2 - θv1;
+  while (d12 <= -Math.PI) d12 += 2*Math.PI;
+  while (d12 >   Math.PI) d12 -= 2*Math.PI;
+  let dp = θp - θv1;
+  while (dp <= -Math.PI) dp += 2*Math.PI;
+  while (dp >   Math.PI) dp -= 2*Math.PI;
+  const eps = 1e-6;
+  return d12 >= 0 ? (dp >= -eps && dp <= d12+eps)
+                  : (dp <=  eps && dp >= d12-eps);
+}
+
+function horocycleFromPtXi(p, xi) {
+  const dot = p[0]*xi[0] + p[1]*xi[1];
+  const p2  = p[0]**2 + p[1]**2;
+  const den = 2*(1 - dot);
+  if (Math.abs(den) < 1e-12) return { center: xi.slice(), radius: 1e-8 };
+  const r = (p2 + 1 - 2*dot) / den;
+  return { center: [(1-r)*xi[0], (1-r)*xi[1]], radius: Math.abs(r) };
+}
+
+function horocycleArcLength(p, q, xi) {
+  const dot_p  = p[0]*xi[0] + p[1]*xi[1];
+  const dot_q  = q[0]*xi[0] + q[1]*xi[1];
+  const cross_p = p[1]*xi[0] - p[0]*xi[1];
+  const cross_q = q[1]*xi[0] - q[0]*xi[1];
+  const d_p = 1 - dot_p, d_q = 1 - dot_q;
+  if (Math.abs(d_p) < 1e-14 || Math.abs(d_q) < 1e-14) return 0;
+  const f_p = cross_p / d_p;
+  const f_q = cross_q / d_q;
+  const one_minus_r = (1 - p[0]*p[0] - p[1]*p[1]) / (2*d_p);
+  if (one_minus_r < 1e-14) return 0;
+  return Math.abs(f_p - f_q) / one_minus_r;
+}
+
+function xiFromTangent(p, t) {
+  const geoDir = [-t[1], t[0]];
+  const tn = Math.sqrt(geoDir[0]**2 + geoDir[1]**2);
+  if (tn < 1e-12) return [1, 0];
+  const gc = geodesicCircumferenceFromPtv(p, geoDir);
+  if (!isFinite(gc.radius) || gc.radius > 1e8) return [geoDir[0]/tn, geoDir[1]/tn];
+  const c = gc.center, cm2 = c[0]**2 + c[1]**2;
+  if (cm2 <= 1+1e-10) { const cm=Math.sqrt(Math.max(cm2,1e-14)); return [c[0]/cm,c[1]/cm]; }
+  const cm=Math.sqrt(cm2), h=Math.sqrt(1-1/cm2), perp=[-c[1]/cm,c[0]/cm];
+  const xi1=[c[0]/cm2+h*perp[0],c[1]/cm2+h*perp[1]];
+  const xi2=[c[0]/cm2-h*perp[0],c[1]/cm2-h*perp[1]];
+  const det=(p[0]-c[0])*geoDir[1]-(p[1]-c[1])*geoDir[0];
+  const goCW=det<=0;
+  const a1=angleCW2D([p[0]-c[0],p[1]-c[1]],[xi1[0]-c[0],xi1[1]-c[1]],goCW);
+  const a2=angleCW2D([p[0]-c[0],p[1]-c[1]],[xi2[0]-c[0],xi2[1]-c[1]],goCW);
+  return a1<a2 ? xi1 : xi2;
+}
+
+function applyXiReflection(xi, p1, p2) {
+  const denom = csub([1,0], xi);
+  if (Math.abs(denom[0])<1e-10 && Math.abs(denom[1])<1e-10) return xi;
+  const eta_c = cdiv(cmul([0,1], cadd([1,0],xi)), denom);
+  const eta1 = eta_c[0];
+  const z1 = poincareToUpperHalf([p1[0],p1[1]]);
+  const z2 = poincareToUpperHalf([p2[0],p2[1]]);
+  const x1=z1[0],y1=z1[1],x2=z2[0],y2=z2[1];
+  const c_uh=(x1*x1+y1*y1-x2*x2-y2*y2)/(2*(x1-x2));
+  const r_uh=Math.sqrt((x1-c_uh)**2+y1*y1);
+  const Mreal=[[1,-(c_uh-r_uh)],[1,-(c_uh+r_uh)]];
+  const J=[[-1,0],[0,1]];
+  const isoR=mat2mul(mat2inv(Mreal),mat2mul(J,Mreal));
+  const d=isoR[1][0]*eta1+isoR[1][1];
+  if (Math.abs(d)<1e-12) return xi;
+  const eta2=(isoR[0][0]*eta1+isoR[0][1])/d;
+  const xi2=cdiv(csub([eta2,0],[0,1]),cadd([eta2,0],[0,1]));
+  const n=Math.sqrt(xi2[0]*xi2[0]+xi2[1]*xi2[1]);
+  return n<1e-12?[1,0]:[xi2[0]/n,xi2[1]/n];
+}
+
+function updateXi(xi, pairing, isNC, polytopes) {
+  const xi1 = matApply(pairing.iso.poincare, xi);
+  const n1 = Math.sqrt(xi1[0]*xi1[0]+xi1[1]*xi1[1]);
+  const xi1n = n1<1e-12?[1,0]:[xi1[0]/n1,xi1[1]/n1];
+  if (!isNC) return xi1n;
+  const s = pairing.outSide;
+  const p1=polytopes[pairing.outHex][s];
+  const p2=polytopes[pairing.outHex][(s+1)%6];
+  return applyXiReflection(xi1n,p1,p2);
+}
+
+function horocycleFirstIntersection(p, xi, dir, circles, verts, toAvoid) {
+  const horo = horocycleFromPtXi(p, xi);
+  const cx=horo.center[0], cy=horo.center[1], r=horo.radius;
+  if (r<1e-10) return null;
+  const goCW=dir<0;
+  const intPoints=[];
+  for (let s=0;s<circles.length;s++){
+    // Don't skip toAvoid — horocycles can cross the same side twice.
+    // Filter out entry point by Euclidean distance instead.
+    const pts=findIntersectionCircles([cx,cy],r,circles[s].center,circles[s].radius);
+    if (!pts) continue;
+    const v1=verts[s], v2=verts[(s+1)%6];
+    for (const pt of [pts[0],pts[1]]){
+      const dx=pt[0]-p[0], dy=pt[1]-p[1];
+      if (dx*dx+dy*dy<1e-12) continue;  // skip entry point
+      if (isOnArc(pt,v1,v2,circles[s].center)) intPoints.push({pt,side:s});
+    }
+  }
+  let minAng=Infinity,bestIdx=-1;
+  for (let i=0;i<intPoints.length;i++){
+    const ang=angleCW2D([p[0]-cx,p[1]-cy],[intPoints[i].pt[0]-cx,intPoints[i].pt[1]-cy],goCW);
+    if (ang>1e-10&&ang<minAng){minAng=ang;bestIdx=i;}
+  }
+  if (bestIdx<0) return null;
+  const arrPt=intPoints[bestIdx].pt;
+  const arrSide=intPoints[bestIdx].side;
+  const rx=arrPt[0]-cx,ry=arrPt[1]-cy;
+  const tv_x=dir>0?-ry:ry, tv_y=dir>0?rx:-rx;
+  const np2=arrPt[0]**2+arrPt[1]**2;
+  const tvn=Math.sqrt(tv_x**2+tv_y**2);
+  if (tvn<1e-12) return null;
+  const scale=(2*(1-np2))**2;
+  return {point:arrPt,tgVec:[tv_x/tvn*scale,tv_y/tvn*scale],
+          side:arrSide,horoCenter:[cx,cy],horoRadius:r,dir};
+}
+
+function rescaleHoroTg(p,t){
+  const np2=p[0]**2+p[1]**2,scale=(2*(1-np2))**2,tn=Math.sqrt(t[0]**2+t[1]**2);
+  return tn<1e-14?[scale,0]:[t[0]/tn*scale,t[1]/tn*scale];
+}
+
+function initTravelDir(pt, xi, t) {
+  const h=horocycleFromPtXi(pt,xi);
+  const tccw_x=-(pt[1]-h.center[1]),tccw_y=pt[0]-h.center[0];
+  return (tccw_x*t[0]+tccw_y*t[1])>=0?1:-1;
+}
+
+// ─── Hexagon membership check ────────────────────────────────────────────────
+function isInsideHexagon(p, circlesForHex, bary, skipSide) {
+  for (let s=0;s<6;s++){
+    if (s===skipSide) continue;
+    const c=circlesForHex[s];
+    const cx=c.center[0],cy=c.center[1],r=c.radius;
+    const d2b=(bary[0]-cx)**2+(bary[1]-cy)**2;
+    const d2p=(p[0]-cx)**2+(p[1]-cy)**2;
+    if ((d2b<r*r) !== (d2p<r*r)) return {inside:false,side:s};
+  }
+  return {inside:true,side:-1};
+}
+
+// ─── Arc interior check ──────────────────────────────────────────────────────
+function checkArcInterior(sp, ep, hc, hr, dir, circlesForHex, bary) {
+  const NARC=20, cx=hc[0], cy=hc[1];
+  const a1=Math.atan2(sp[1]-cy,sp[0]-cx);
+  let diff=Math.atan2(ep[1]-cy,ep[0]-cx)-a1;
+  if (dir>0){while(diff<=0)diff+=2*Math.PI;} else{while(diff>=0)diff-=2*Math.PI;}
+  for (let k=1;k<NARC;k++){
+    const t=a1+diff*k/NARC;
+    const px=cx+hr*Math.cos(t),py=cy+hr*Math.sin(t);
+    const chk=isInsideHexagon([px,py],circlesForHex,bary,-1);
+    if (!chk.inside) return {k,side:chk.side,pt:[px,py]};
+  }
+  return null;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEST 1: Domain exit test (endpoint + arc interior)
+// ═══════════════════════════════════════════════════════════════════════════════
+function testDomainExits(gluingType, nSteps) {
+  emit('inf',`  gluing=${gluingType}  steps=${nSteps}`);
+  const gluing = gluingType==='separating'?createGluingSeparatingS2():createGluingNonseparatingS2();
+  const polytopes = buildPolytopes(gluing,[2,3,4]);
+  const circles   = buildCircles(polytopes);
+
+  const baryCenters=[];
+  for(let h=0;h<4;h++){
+    let bx=0,by=0;
+    for(let k=0;k<6;k++){bx+=polytopes[h][k][0];by+=polytopes[h][k][1];}
+    baryCenters.push([bx/6,by/6]);
+  }
+
+  let p=[1e-4,1e-4];
+  const a0=0.7, sc0=5*(1-(p[0]**2+p[1]**2))**2;
+  const initT=[sc0*Math.cos(a0),-sc0*Math.sin(a0)];
+  let curXi=xiFromTangent(p,initT);
+  let travelDir=initTravelDir(p,curXi,initT);
+  let poly=0, avoid=6;
+
+  let exits=0, arcExits=0, nulls=0;
+  const firstExits=[], firstArcExits=[];
+
+  for (let step=0;step<nSteps;step++){
+    const inter=horocycleFirstIntersection(p,curXi,travelDir,circles[poly],polytopes[poly],avoid);
+    if (!inter){
+      nulls++;
+      const a2=(step*1.618)%(2*Math.PI);
+      const t2=[Math.cos(a2),-Math.sin(a2)];
+      curXi=xiFromTangent(p,t2);
+      travelDir=initTravelDir(p,curXi,t2);
+      continue;
+    }
+
+    const arcChk=checkArcInterior(p,inter.point,inter.horoCenter,inter.horoRadius,
+                                   inter.dir,circles[poly],baryCenters[poly]);
+    if (arcChk){
+      arcExits++;
+      if(firstArcExits.length<5)
+        firstArcExits.push(`step=${step} hex=${poly} dir=${inter.dir} exitSide=${arcChk.side}`);
+    }
+
+    const oldPoly=poly;
+    const pairing=pairingFromGluing(gluing,poly,inter.side,[0,0,0],inter.point,polytopes);
+    const pr=applyPairing(inter.point,inter.tgVec,poly,inter.side,gluing,[0,0,0],polytopes);
+    const isNC=isRow([oldPoly,pr.polyIdx],gluing.noncoherentPairs);
+
+    curXi=updateXi(curXi,pairing,isNC,polytopes);
+    p=pr.point;
+    if (isNC) travelDir=-travelDir;
+    poly=pr.polyIdx; avoid=pr.toAvoid;
+
+    const chk=isInsideHexagon(p,circles[poly],baryCenters[poly],avoid);
+    if (!chk.inside){
+      exits++;
+      if(firstExits.length<5)
+        firstExits.push(`step=${step} ${oldPoly}[s${inter.side}]->${poly}(skip s${avoid}) nc=${isNC} failSide=${chk.side}`);
+    }
+  }
+
+  const exitCls=exits===0?'ok':'err';
+  const arcCls =arcExits===0?'ok':'err';
+  emit(exitCls,`    endpoint exits=${exits}  nulls=${nulls}`);
+  emit(arcCls, `    arc interior exits=${arcExits}`);
+  for(const x of firstExits)    emit('err','    EXIT: '+x);
+  for(const x of firstArcExits) emit('err','    ARC:  '+x);
+  if(exits===0&&arcExits===0) emit('ok','    ✓ no exits');
+  return {exits, arcExits, nulls};
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEST 2: ξ stays on S¹ (unit circle)
+// ═══════════════════════════════════════════════════════════════════════════════
+function testXiOnCircle(gluingType, nSteps) {
+  emit('inf',`  gluing=${gluingType}  steps=${nSteps}`);
+  const gluing = gluingType==='separating'?createGluingSeparatingS2():createGluingNonseparatingS2();
+  const polytopes = buildPolytopes(gluing,[2,3,4]);
+  const circles   = buildCircles(polytopes);
+
+  let p=[1e-4,1e-4];
+  const a0=0.7, sc0=5*(1-(p[0]**2+p[1]**2))**2;
+  const initT=[sc0*Math.cos(a0),-sc0*Math.sin(a0)];
+  let curXi=xiFromTangent(p,initT);
+  let travelDir=initTravelDir(p,curXi,initT);
+  let poly=0, avoid=6;
+
+  let maxDrift=0, driftCount=0;
+
+  for (let step=0;step<nSteps;step++){
+    // Check |ξ| = 1
+    const xiNorm=Math.sqrt(curXi[0]**2+curXi[1]**2);
+    const drift=Math.abs(xiNorm-1);
+    if (drift>maxDrift) maxDrift=drift;
+    if (drift>1e-6) driftCount++;
+
+    const inter=horocycleFirstIntersection(p,curXi,travelDir,circles[poly],polytopes[poly],avoid);
+    if (!inter){
+      const a2=(step*1.618)%(2*Math.PI);
+      const t2=[Math.cos(a2),-Math.sin(a2)];
+      curXi=xiFromTangent(p,t2);
+      travelDir=initTravelDir(p,curXi,t2);
+      continue;
+    }
+    const pairing=pairingFromGluing(gluing,poly,inter.side,[0,0,0],inter.point,polytopes);
+    const pr=applyPairing(inter.point,inter.tgVec,poly,inter.side,gluing,[0,0,0],polytopes);
+    const isNC=isRow([poly,pr.polyIdx],gluing.noncoherentPairs);
+    curXi=updateXi(curXi,pairing,isNC,polytopes);
+    p=pr.point;
+    if (isNC) travelDir=-travelDir;
+    poly=pr.polyIdx; avoid=pr.toAvoid;
+  }
+
+  const cls=driftCount===0?'ok':'err';
+  emit(cls,`    max |ξ|−1 = ${maxDrift.toExponential(3)}  violations(>1e-6)=${driftCount}`);
+  if (driftCount===0) emit('ok','    ✓ ξ stays on S¹');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEST 3: Horocycle consistency — point lies on the horocycle defined by (p,ξ)
+// ═══════════════════════════════════════════════════════════════════════════════
+function testHorocycleConsistency(gluingType, nSteps) {
+  emit('inf',`  gluing=${gluingType}  steps=${nSteps}`);
+  const gluing = gluingType==='separating'?createGluingSeparatingS2():createGluingNonseparatingS2();
+  const polytopes = buildPolytopes(gluing,[2,3,4]);
+  const circles   = buildCircles(polytopes);
+
+  let p=[1e-4,1e-4];
+  const a0=0.7, sc0=5*(1-(p[0]**2+p[1]**2))**2;
+  const initT=[sc0*Math.cos(a0),-sc0*Math.sin(a0)];
+  let curXi=xiFromTangent(p,initT);
+  let travelDir=initTravelDir(p,curXi,initT);
+  let poly=0, avoid=6;
+
+  let maxErr=0, errCount=0;
+
+  for (let step=0;step<nSteps;step++){
+    // Check: p lies on the horocycle (center,radius) defined by (p,ξ)
+    const horo=horocycleFromPtXi(p,curXi);
+    const d=Math.sqrt((p[0]-horo.center[0])**2+(p[1]-horo.center[1])**2);
+    const err=Math.abs(d-horo.radius);
+    if (err>maxErr) maxErr=err;
+    if (err>1e-6) errCount++;
+
+    // Check: the horocycle is tangent to S¹ at ξ
+    const cNorm=Math.sqrt(horo.center[0]**2+horo.center[1]**2);
+    const tangentErr=Math.abs(cNorm+horo.radius-1);
+    if (tangentErr>maxErr) maxErr=tangentErr;
+    if (tangentErr>1e-6) errCount++;
+
+    const inter=horocycleFirstIntersection(p,curXi,travelDir,circles[poly],polytopes[poly],avoid);
+    if (!inter){
+      const a2=(step*1.618)%(2*Math.PI);
+      const t2=[Math.cos(a2),-Math.sin(a2)];
+      curXi=xiFromTangent(p,t2);
+      travelDir=initTravelDir(p,curXi,t2);
+      continue;
+    }
+    const pairing=pairingFromGluing(gluing,poly,inter.side,[0,0,0],inter.point,polytopes);
+    const pr=applyPairing(inter.point,inter.tgVec,poly,inter.side,gluing,[0,0,0],polytopes);
+    const isNC=isRow([poly,pr.polyIdx],gluing.noncoherentPairs);
+    curXi=updateXi(curXi,pairing,isNC,polytopes);
+    p=pr.point;
+    if (isNC) travelDir=-travelDir;
+    poly=pr.polyIdx; avoid=pr.toAvoid;
+  }
+
+  const cls=errCount===0?'ok':'err';
+  emit(cls,`    max geometric error = ${maxErr.toExponential(3)}  violations(>1e-6)=${errCount}`);
+  if (errCount===0) emit('ok','    ✓ horocycle geometry consistent');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEST 4: Arc length positivity and finiteness
+// ═══════════════════════════════════════════════════════════════════════════════
+function testArcLength(gluingType, nSteps) {
+  emit('inf',`  gluing=${gluingType}  steps=${nSteps}`);
+  const gluing = gluingType==='separating'?createGluingSeparatingS2():createGluingNonseparatingS2();
+  const polytopes = buildPolytopes(gluing,[2,3,4]);
+  const circles   = buildCircles(polytopes);
+
+  let p=[1e-4,1e-4];
+  const a0=0.7, sc0=5*(1-(p[0]**2+p[1]**2))**2;
+  const initT=[sc0*Math.cos(a0),-sc0*Math.sin(a0)];
+  let curXi=xiFromTangent(p,initT);
+  let travelDir=initTravelDir(p,curXi,initT);
+  let poly=0, avoid=6;
+
+  let negCount=0, nanCount=0, zeroCount=0, totalLen=0, count=0;
+
+  for (let step=0;step<nSteps;step++){
+    const inter=horocycleFirstIntersection(p,curXi,travelDir,circles[poly],polytopes[poly],avoid);
+    if (!inter){
+      const a2=(step*1.618)%(2*Math.PI);
+      const t2=[Math.cos(a2),-Math.sin(a2)];
+      curXi=xiFromTangent(p,t2);
+      travelDir=initTravelDir(p,curXi,t2);
+      continue;
+    }
+    const L=horocycleArcLength(p,inter.point,curXi);
+    if (L<0) negCount++;
+    if (!isFinite(L)) nanCount++;
+    if (L===0) zeroCount++;
+    totalLen+=L; count++;
+
+    const pairing=pairingFromGluing(gluing,poly,inter.side,[0,0,0],inter.point,polytopes);
+    const pr=applyPairing(inter.point,inter.tgVec,poly,inter.side,gluing,[0,0,0],polytopes);
+    const isNC=isRow([poly,pr.polyIdx],gluing.noncoherentPairs);
+    curXi=updateXi(curXi,pairing,isNC,polytopes);
+    p=pr.point;
+    if (isNC) travelDir=-travelDir;
+    poly=pr.polyIdx; avoid=pr.toAvoid;
+  }
+
+  const ok=negCount===0&&nanCount===0;
+  emit(ok?'ok':'err',`    neg=${negCount} NaN/Inf=${nanCount} zero=${zeroCount} avgLen=${(totalLen/count).toFixed(4)}`);
+  if (ok) emit('ok','    ✓ arc lengths all positive & finite');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEST 5: Intersection is truly the FIRST (no closer one exists)
+// ═══════════════════════════════════════════════════════════════════════════════
+function testFirstIntersection(gluingType, nSteps) {
+  emit('inf',`  gluing=${gluingType}  steps=${nSteps}`);
+  const gluing = gluingType==='separating'?createGluingSeparatingS2():createGluingNonseparatingS2();
+  const polytopes = buildPolytopes(gluing,[2,3,4]);
+  const circles   = buildCircles(polytopes);
+
+  let p=[1e-4,1e-4];
+  const a0=0.7, sc0=5*(1-(p[0]**2+p[1]**2))**2;
+  const initT=[sc0*Math.cos(a0),-sc0*Math.sin(a0)];
+  let curXi=xiFromTangent(p,initT);
+  let travelDir=initTravelDir(p,curXi,initT);
+  let poly=0, avoid=6;
+  let violations=0;
+
+  for (let step=0;step<nSteps;step++){
+    const inter=horocycleFirstIntersection(p,curXi,travelDir,circles[poly],polytopes[poly],avoid);
+    if (!inter){
+      const a2=(step*1.618)%(2*Math.PI);
+      const t2=[Math.cos(a2),-Math.sin(a2)];
+      curXi=xiFromTangent(p,t2);
+      travelDir=initTravelDir(p,curXi,t2);
+      continue;
+    }
+
+    // Brute-force: collect ALL on-arc intersections (no toAvoid skip) and
+    // verify our chosen one has the smallest angle.
+    const horo=horocycleFromPtXi(p,curXi);
+    const cx=horo.center[0],cy=horo.center[1],r=horo.radius;
+    const goCW=travelDir<0;
+    let allPts=[];
+    for (let s=0;s<circles[poly].length;s++){
+      const pts=findIntersectionCircles([cx,cy],r,circles[poly][s].center,circles[poly][s].radius);
+      if (!pts) continue;
+      const v1=polytopes[poly][s],v2=polytopes[poly][(s+1)%6];
+      for (const pt of [pts[0],pts[1]]){
+        const dx=pt[0]-p[0],dy=pt[1]-p[1];
+        if (dx*dx+dy*dy<1e-12) continue;
+        if (isOnArc(pt,v1,v2,circles[poly][s].center)){
+          const ang=angleCW2D([p[0]-cx,p[1]-cy],[pt[0]-cx,pt[1]-cy],goCW);
+          if (ang>1e-10) allPts.push({ang,side:s});
+        }
+      }
+    }
+    if (allPts.length>0){
+      allPts.sort((a,b)=>a.ang-b.ang);
+      const chosenAng=angleCW2D([p[0]-cx,p[1]-cy],
+                                [inter.point[0]-cx,inter.point[1]-cy],goCW);
+      if (Math.abs(chosenAng-allPts[0].ang)>1e-6){
+        violations++;
+        if(violations<=3)
+          emit('err',`    step=${step}: chosen ang=${chosenAng.toFixed(6)} but min=${allPts[0].ang.toFixed(6)} (side ${allPts[0].side})`);
+      }
+    }
+
+    const pairing=pairingFromGluing(gluing,poly,inter.side,[0,0,0],inter.point,polytopes);
+    const pr=applyPairing(inter.point,inter.tgVec,poly,inter.side,gluing,[0,0,0],polytopes);
+    const isNC=isRow([poly,pr.polyIdx],gluing.noncoherentPairs);
+    curXi=updateXi(curXi,pairing,isNC,polytopes);
+    p=pr.point;
+    if (isNC) travelDir=-travelDir;
+    poly=pr.polyIdx; avoid=pr.toAvoid;
+  }
+
+  emit(violations===0?'ok':'err',`    first-intersection violations=${violations}`);
+  if (violations===0) emit('ok','    ✓ always picks the first intersection');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEST 6: Distribution uniformity (Kolmogorov-Smirnov on curve-1 position)
+// ═══════════════════════════════════════════════════════════════════════════════
+function testDistributionUniformity(gluingType) {
+  const nSteps=20000;
+  emit('inf',`  gluing=${gluingType}  steps=${nSteps} (warmup=2000)`);
+  const gluing = gluingType==='separating'?createGluingSeparatingS2():createGluingNonseparatingS2();
+  const polytopes = buildPolytopes(gluing,[2,3,4]);
+  const circles   = buildCircles(polytopes);
+  const curveCombinations = gluing.curveCombinations[0]; // curve 1
+
+  let p=[1e-4,1e-4];
+  const a0=0.7, sc0=5*(1-(p[0]**2+p[1]**2))**2;
+  const initT=[sc0*Math.cos(a0),-sc0*Math.sin(a0)];
+  let curXi=xiFromTangent(p,initT);
+  let travelDir=initTravelDir(p,curXi,initT);
+  let poly=0, avoid=6;
+
+  // Warmup
+  for (let w=0;w<2000;w++){
+    const inter=horocycleFirstIntersection(p,curXi,travelDir,circles[poly],polytopes[poly],avoid);
+    if (!inter){
+      const a2=(w*1.618)%(2*Math.PI);
+      const t2=[Math.cos(a2),-Math.sin(a2)];
+      curXi=xiFromTangent(p,t2);
+      travelDir=initTravelDir(p,curXi,t2);
+      continue;
+    }
+    const pairing=pairingFromGluing(gluing,poly,inter.side,[0,0,0],inter.point,polytopes);
+    const pr=applyPairing(inter.point,inter.tgVec,poly,inter.side,gluing,[0,0,0],polytopes);
+    const isNC=isRow([poly,pr.polyIdx],gluing.noncoherentPairs);
+    curXi=updateXi(curXi,pairing,isNC,polytopes);
+    p=pr.point;
+    if (isNC) travelDir=-travelDir;
+    poly=pr.polyIdx; avoid=pr.toAvoid;
+  }
+
+  // Collect curve-1 crossing positions
+  // Position along side s: fraction of arc from vertex s to vertex (s+1)%6
+  const positions=[];
+  for (let step=0;step<nSteps;step++){
+    const inter=horocycleFirstIntersection(p,curXi,travelDir,circles[poly],polytopes[poly],avoid);
+    if (!inter){
+      const a2=(step*1.618)%(2*Math.PI);
+      const t2=[Math.cos(a2),-Math.sin(a2)];
+      curXi=xiFromTangent(p,t2);
+      travelDir=initTravelDir(p,curXi,t2);
+      continue;
+    }
+
+    // Check if this side is a curve-1 side
+    let isCurve1=false;
+    for (const cc of curveCombinations){
+      if (cc[0]===poly && cc[1]===inter.side) {isCurve1=true;break;}
+    }
+    if (isCurve1){
+      // Compute position along the geodesic side as a fraction
+      const v1=polytopes[poly][inter.side];
+      const v2=polytopes[poly][(inter.side+1)%6];
+      const sideLen=distanceTwoPoints(v1,v2);
+      const pos=distanceTwoPoints(v1,inter.point)/sideLen;
+      positions.push(Math.min(1,Math.max(0,pos)));
+    }
+
+    const pairing=pairingFromGluing(gluing,poly,inter.side,[0,0,0],inter.point,polytopes);
+    const pr=applyPairing(inter.point,inter.tgVec,poly,inter.side,gluing,[0,0,0],polytopes);
+    const isNC=isRow([poly,pr.polyIdx],gluing.noncoherentPairs);
+    curXi=updateXi(curXi,pairing,isNC,polytopes);
+    p=pr.point;
+    if (isNC) travelDir=-travelDir;
+    poly=pr.polyIdx; avoid=pr.toAvoid;
+  }
+
+  if (positions.length<20){
+    emit('wrn',`    only ${positions.length} curve-1 crossings — too few for KS test`);
+    return;
+  }
+
+  // Kolmogorov-Smirnov test against Uniform[0,1]
+  positions.sort((a,b)=>a-b);
+  const n=positions.length;
+  let ksMax=0;
+  for (let i=0;i<n;i++){
+    const F_emp=(i+1)/n;
+    const F_theo=positions[i];
+    ksMax=Math.max(ksMax,Math.abs(F_emp-F_theo));
+  }
+  // KS critical value at 5% significance: 1.36/sqrt(n)
+  const ksCrit=1.36/Math.sqrt(n);
+  const pass=ksMax<ksCrit;
+  emit(pass?'ok':'wrn',`    KS stat=${ksMax.toFixed(4)}  critical(5%)=${ksCrit.toFixed(4)}  n=${n}  ${pass?'PASS':'FAIL (non-uniform?)'}`);
+
+  // Also report histogram (10 bins)
+  const bins=new Array(10).fill(0);
+  for (const pos of positions) bins[Math.min(9,Math.floor(pos*10))]++;
+  const expected=n/10;
+  let histStr='    bins: ';
+  for (let b=0;b<10;b++) histStr+=`${bins[b]} `;
+  histStr+=`  (expected ~${expected.toFixed(0)} each)`;
+  emit('inf',histStr);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEST 7: ξ–tangent consistency
+// Compares updateXi(ξ) with xiFromTangent(pr.point, pr.tgVec), accounting for
+// travelDir sign.  Any discrepancy means the tracked ξ drifts from the actual
+// horocycle defined by the transformed tangent.
+// ═══════════════════════════════════════════════════════════════════════════════
+function testXiTangentConsistency(gluingType, nSteps) {
+  emit('inf',`  gluing=${gluingType}  steps=${nSteps}`);
+  const gluing = gluingType==='separating'?createGluingSeparatingS2():createGluingNonseparatingS2();
+  const polytopes = buildPolytopes(gluing,[2,3,4]);
+  const circles   = buildCircles(polytopes);
+
+  let p=[1e-4,1e-4];
+  const a0=0.7, sc0=5*(1-(p[0]**2+p[1]**2))**2;
+  const initT=[sc0*Math.cos(a0),-sc0*Math.sin(a0)];
+  let curXi=xiFromTangent(p,initT);
+  let travelDir=initTravelDir(p,curXi,initT);
+  let poly=0, avoid=6;
+  let maxErr=0, errCount=0;
+
+  for (let step=0;step<nSteps;step++){
+    const inter=horocycleFirstIntersection(p,curXi,travelDir,circles[poly],polytopes[poly],avoid);
+    if (!inter){
+      const a2=(step*1.618)%(2*Math.PI);
+      const t2=[Math.cos(a2),-Math.sin(a2)];
+      curXi=xiFromTangent(p,t2);
+      travelDir=initTravelDir(p,curXi,t2);
+      continue;
+    }
+    const pairing=pairingFromGluing(gluing,poly,inter.side,[0,0,0],inter.point,polytopes);
+    const pr=applyPairing(inter.point,inter.tgVec,poly,inter.side,gluing,[0,0,0],polytopes);
+    const isNC=isRow([poly,pr.polyIdx],gluing.noncoherentPairs);
+    const newXi=updateXi(curXi,pairing,isNC,polytopes);
+    const newDir=isNC?-travelDir:travelDir;
+    // xiFromTangent assumes CCW convention; negate tangent for CW travel
+    const tForXi=newDir>0?[pr.tgVec[0],pr.tgVec[1]]:[-pr.tgVec[0],-pr.tgVec[1]];
+    const xiFromTg=xiFromTangent(pr.point,tForXi);
+    const dx=newXi[0]-xiFromTg[0],dy=newXi[1]-xiFromTg[1];
+    const err=Math.sqrt(dx*dx+dy*dy);
+    if (err>maxErr) maxErr=err;
+    if (err>1e-4) errCount++;
+    curXi=newXi; p=pr.point; travelDir=newDir;
+    poly=pr.polyIdx; avoid=pr.toAvoid;
+  }
+  const cls=errCount===0?'ok':'err';
+  emit(cls,`    max ξ–tangent error = ${maxErr.toExponential(3)}  violations(>1e-4)=${errCount}`);
+  if (errCount===0) emit('ok','    ✓ updateXi perfectly consistent with xiFromTangent');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// TEST 8: Same-side re-entry (verifies toAvoid fix)
+// Counts how often the horocycle exits through the same side it entered from.
+// ═══════════════════════════════════════════════════════════════════════════════
+function testSameSideReentry(gluingType, nSteps) {
+  emit('inf',`  gluing=${gluingType}  steps=${nSteps}`);
+  const gluing = gluingType==='separating'?createGluingSeparatingS2():createGluingNonseparatingS2();
+  const polytopes = buildPolytopes(gluing,[2,3,4]);
+  const circles   = buildCircles(polytopes);
+
+  let p=[1e-4,1e-4];
+  const a0=0.7, sc0=5*(1-(p[0]**2+p[1]**2))**2;
+  const initT=[sc0*Math.cos(a0),-sc0*Math.sin(a0)];
+  let curXi=xiFromTangent(p,initT);
+  let travelDir=initTravelDir(p,curXi,initT);
+  let poly=0, avoid=6;
+  let sameSideCount=0;
+
+  for (let step=0;step<nSteps;step++){
+    const inter=horocycleFirstIntersection(p,curXi,travelDir,circles[poly],polytopes[poly],avoid);
+    if (!inter){
+      const a2=(step*1.618)%(2*Math.PI);
+      const t2=[Math.cos(a2),-Math.sin(a2)];
+      curXi=xiFromTangent(p,t2);
+      travelDir=initTravelDir(p,curXi,t2);
+      continue;
+    }
+
+    if (inter.side===avoid) sameSideCount++;
+
+    const pairing=pairingFromGluing(gluing,poly,inter.side,[0,0,0],inter.point,polytopes);
+    const pr=applyPairing(inter.point,inter.tgVec,poly,inter.side,gluing,[0,0,0],polytopes);
+    const isNC=isRow([poly,pr.polyIdx],gluing.noncoherentPairs);
+    curXi=updateXi(curXi,pairing,isNC,polytopes);
+    p=pr.point;
+    if (isNC) travelDir=-travelDir;
+    poly=pr.polyIdx; avoid=pr.toAvoid;
+  }
+
+  emit('inf',`    same-side re-entries: ${sameSideCount}/${nSteps} (${(100*sameSideCount/nSteps).toFixed(1)}%)`);
+  if (sameSideCount>0) emit('ok','    ✓ toAvoid fix working — horocycle re-crosses same side');
+  else emit('inf','    (none found — may be geometry-dependent)');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Run all tests
+// ═══════════════════════════════════════════════════════════════════════════════
+window.addEventListener('load', function(){
+  emit('inf','═══ HOROCYCLIC FLOW — COMPREHENSIVE TEST SUITE ═══\n');
+
+  emit('inf','▸ Test 1: Domain exit (endpoint + arc interior)');
+  for(const gl of ['separating','nonseparating']) testDomainExits(gl,5000);
+
+  emit('inf','\n▸ Test 2: ξ stays on S¹');
+  for(const gl of ['separating','nonseparating']) testXiOnCircle(gl,5000);
+
+  emit('inf','\n▸ Test 3: Horocycle geometry consistency');
+  for(const gl of ['separating','nonseparating']) testHorocycleConsistency(gl,5000);
+
+  emit('inf','\n▸ Test 4: Arc length positivity');
+  for(const gl of ['separating','nonseparating']) testArcLength(gl,5000);
+
+  emit('inf','\n▸ Test 5: First intersection correctness');
+  for(const gl of ['separating','nonseparating']) testFirstIntersection(gl,5000);
+
+  emit('inf','\n▸ Test 6: Distribution uniformity (KS test)');
+  for(const gl of ['separating','nonseparating']) testDistributionUniformity(gl);
+
+  emit('inf','\n▸ Test 7: ξ–tangent consistency');
+  for(const gl of ['separating','nonseparating']) testXiTangentConsistency(gl,5000);
+
+  emit('inf','\n▸ Test 8: Same-side re-entry (toAvoid fix verification)');
+  for(const gl of ['separating','nonseparating']) testSameSideReentry(gl,5000);
+
+  emit('inf','\n═══ ALL TESTS COMPLETE ═══');
+});
+</script>
+</body>
+</html>

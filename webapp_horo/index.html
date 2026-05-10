@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HyperMarimba — Horocyclic Flow</title>
+<link rel="stylesheet" href="../webapp/style.css">
+<style>
+body { align-items: stretch; }
+
+.app-container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 0 20px 60px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.app-header {
+  text-align: center;
+  padding: 28px 0 16px;
+}
+.app-header h1 { font-size: 1.8rem; margin: 0 0 8px; }
+.app-header .subtitle { font-size: 0.88rem; color: #a0a0c0; margin: 0; }
+.app-header .subtitle a { color: #c9a96e; text-decoration: none; }
+.app-header .subtitle a:hover { text-decoration: underline; }
+
+.panel {
+  border: 1px solid #0f3460;
+  border-radius: 10px;
+  background: #16213e;
+  padding: 18px 20px;
+  margin: 12px 0;
+}
+.panel-title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: #c9a96e;
+  margin: 0 0 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.description {
+  font-size: 0.88rem;
+  color: #b0c0d0;
+  line-height: 1.7;
+  margin: 0;
+}
+.description strong { color: #e8d5b7; }
+.description em { color: #7fc0e8; }
+
+.hex-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-top: 10px;
+}
+.hex-grid canvas {
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.note-legend {
+  display: flex;
+  gap: 16px;
+  font-size: 0.78rem;
+  color: #888;
+  margin-top: 8px;
+  justify-content: center;
+}
+.note-legend span { display: flex; align-items: center; gap: 4px; }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+/* Horo arc accent colour: teal/blue */
+.horo-accent { color: #37aff5; }
+
+/* Collapsible sub-panels */
+.iso-sub-header {
+  cursor: pointer;
+  user-select: none;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #c9a96e;
+  padding: 6px 0;
+  border-bottom: 1px solid #0f3460;
+  margin-bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.iso-sub-header::before { content: '▶'; font-size: 0.65rem; transition: transform 0.15s; }
+.iso-sub-open.iso-sub-header::before { transform: rotate(90deg); }
+.iso-sub-body {
+  display: none;
+  padding-top: 10px;
+}
+
+/* Partiture canvas */
+.partiture-wrap {
+  border: 1px solid #0f3460;
+  border-radius: 4px;
+  overflow: hidden;
+  background: #0a0a1a;
+}
+.partiture-wrap canvas {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* Compact two-col grid for compare surfaces */
+.cmp-surfaces-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+@media (max-width: 640px) { .cmp-surfaces-grid { grid-template-columns: 1fr; } }
+
+.cmp-surface-box {
+  border: 1px solid #0f3460;
+  border-radius: 8px;
+  padding: 12px;
+  background: #0d2040;
+}
+.cmp-surface-box .group-title {
+  font-size: 0.78rem;
+  color: #c9a96e;
+  font-weight: 700;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Results preformatted text */
+.results-pre {
+  font-size: 0.78rem;
+  font-family: monospace;
+  color: #b0c8e0;
+  background: #0a0a1a;
+  border-radius: 4px;
+  padding: 8px;
+  white-space: pre-wrap;
+  margin-top: 8px;
+}
+</style>
+</head>
+<body>
+
+<div class="app-container">
+
+  <div class="app-header">
+    <h1>HyperMarimba — Horocyclic Flow</h1>
+    <p class="subtitle">
+      <a href="https://ludox73.github.io/">Ludovico Battista</a> and
+      <a href="https://juan.perlora.eu">Juan Souto</a>
+      &nbsp;|&nbsp;
+      <a href="../webapp/story.html" style="color:#888">← Geodesic flow version</a>
+    </p>
+  </div>
+
+  <!-- Description -->
+  <div class="panel">
+    <p class="description">
+      In the <a href="../webapp/story.html" style="color:#c9a96e">geodesic flow version</a> a point moves along
+      <strong>geodesics</strong> on a genus-2 hyperbolic surface constructed from four right-angled hexagons.
+      Here instead the point moves along <strong>horocycles</strong> — circles tangent to the boundary of the
+      Poincaré disk at an <em>ideal point</em> ξ. Whenever the horocyclic trajectory crosses one of the three
+      marked curves on the surface, a marimba note is played.
+    </p>
+    <p class="description" style="margin-top:10px">
+      The horocyclic flow is <strong>uniquely ergodic</strong>: unlike geodesic flow, almost every horocyclic
+      orbit equidistributes with respect to the Liouville measure, producing a distinctly different rhythmic
+      texture. The arcs drawn below (in <span class="horo-accent">blue</span>) are arcs of Euclidean circles
+      entirely contained inside the disk — the horocycles of the Poincaré model.
+    </p>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       Surface parameters
+  ════════════════════════════════════════════════════════════════ -->
+  <div class="panel">
+    <div class="panel-title">Surface Parameters</div>
+    <div class="controls-row">
+
+      <div class="controls-group">
+        <div class="group-title">Pants Decomposition</div>
+        <select id="horo-gluing-type" style="width:100%">
+          <option value="separating">With Separating Component</option>
+          <option value="nonseparating">No Separating Component</option>
+        </select>
+      </div>
+
+      <div class="controls-group">
+        <div class="group-title">Curve Lengths</div>
+        <label>L1 <span class="val" id="horo-v-l1">2.00</span></label>
+        <input type="range" id="horo-l1" min="1" max="7" step="0.01" value="2.00"
+               oninput="document.getElementById('horo-v-l1').textContent=parseFloat(this.value).toFixed(2)">
+        <label>L2 <span class="val" id="horo-v-l2">3.00</span></label>
+        <input type="range" id="horo-l2" min="1" max="7" step="0.01" value="3.00"
+               oninput="document.getElementById('horo-v-l2').textContent=parseFloat(this.value).toFixed(2)">
+        <label>L3 <span class="val" id="horo-v-l3">4.00</span></label>
+        <input type="range" id="horo-l3" min="1" max="7" step="0.01" value="4.00"
+               oninput="document.getElementById('horo-v-l3').textContent=parseFloat(this.value).toFixed(2)">
+      </div>
+
+      <div class="controls-group">
+        <div class="group-title">Twist Parameters</div>
+        <label>T1 <span class="val" id="horo-v-t1">0%</span></label>
+        <input type="range" id="horo-t1" min="0" max="100" step="0.5" value="0"
+               oninput="document.getElementById('horo-v-t1').textContent=Math.round(this.value)+'%'">
+        <label>T2 <span class="val" id="horo-v-t2">0%</span></label>
+        <input type="range" id="horo-t2" min="0" max="100" step="0.5" value="0"
+               oninput="document.getElementById('horo-v-t2').textContent=Math.round(this.value)+'%'">
+        <label>T3 <span class="val" id="horo-v-t3">0%</span></label>
+        <input type="range" id="horo-t3" min="0" max="100" step="0.5" value="0"
+               oninput="document.getElementById('horo-v-t3').textContent=Math.round(this.value)+'%'">
+      </div>
+
+      <div class="controls-group">
+        <div class="group-title">Detect Curves</div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="horo-curve1" checked>
+          <span style="display:inline-block;width:11px;height:11px;background:#964;border-radius:2px;vertical-align:middle;margin:0 5px 0 3px"></span>
+          <label for="horo-curve1">Curve 1</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="horo-curve2" checked>
+          <span style="display:inline-block;width:11px;height:11px;background:#806;border-radius:2px;vertical-align:middle;margin:0 5px 0 3px"></span>
+          <label for="horo-curve2">Curve 2</label>
+        </div>
+        <div class="checkbox-row">
+          <input type="checkbox" id="horo-curve3" checked>
+          <span style="display:inline-block;width:11px;height:11px;background:#555;border-radius:2px;vertical-align:middle;margin:0 5px 0 3px"></span>
+          <label for="horo-curve3">Curve 3</label>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       Flow controls
+  ════════════════════════════════════════════════════════════════ -->
+  <div class="panel">
+    <div class="panel-title">Horocyclic Flow</div>
+    <div class="controls-row">
+
+      <div class="controls-group">
+        <label>Max crossings &nbsp;
+          <input type="number" id="horo-maxcrossings" value="3000" min="100" max="200000" step="500"
+                 style="width:75px">
+        </label>
+        <div style="font-size:.75rem;color:#667;margin-top:4px">
+          Number of curve crossings = musical notes.
+        </div>
+      </div>
+
+      <div class="controls-group">
+        <label>Draw speed &nbsp;<span class="val" id="horo-v-speed">5.0</span></label>
+        <input type="range" id="horo-speed" min="0.5" max="20" step="0.5" value="5"
+               oninput="document.getElementById('horo-v-speed').textContent=parseFloat(this.value).toFixed(1)">
+      </div>
+
+      <div class="controls-group" style="padding-top:18px">
+        <div class="checkbox-row">
+          <input type="checkbox" id="horo-fast-mode">
+          <label for="horo-fast-mode">Fast mode (no animation)</label>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="controls-actions">
+      <button id="horo-btn-run" onclick="startHoroComputation()">Run horocyclic flow</button>
+      <button id="horo-btn-stop" class="stop" onclick="stopHoroComputation()" disabled>Stop</button>
+    </div>
+    <div class="progress-bar">
+      <div class="progress-fill" id="horo-progress-fill"></div>
+    </div>
+    <div class="status" id="horo-status">Ready</div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       Fundamental domain visualization
+  ════════════════════════════════════════════════════════════════ -->
+  <div class="panel">
+    <div class="panel-title">Fundamental Domain — Four Right-angled Hexagons</div>
+    <div class="hex-grid">
+      <canvas id="horo-c0" width="340" height="340"></canvas>
+      <canvas id="horo-c1" width="340" height="340"></canvas>
+      <canvas id="horo-c2" width="340" height="340"></canvas>
+      <canvas id="horo-c3" width="340" height="340"></canvas>
+    </div>
+    <div class="note-legend">
+      <span><span class="dot" style="background:#964"></span> Curve 1 (A = 440 Hz)</span>
+      <span><span class="dot" style="background:#806"></span> Curve 2 (C♯ = 554 Hz)</span>
+      <span><span class="dot" style="background:#555"></span> Curve 3 (E = 659 Hz)</span>
+      <span><span class="dot" style="background:#37aff5"></span> Horocycle arc</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       Audio
+  ════════════════════════════════════════════════════════════════ -->
+  <div class="panel">
+    <div class="panel-title">Listen</div>
+    <div class="controls-row">
+      <div class="controls-group">
+        <label>Playback speed &nbsp;<span class="val" id="horo-v-audiospeed">10.0</span></label>
+        <input type="range" id="horo-audiospeed" min="0.5" max="50" step="0.5" value="10"
+               oninput="document.getElementById('horo-v-audiospeed').textContent=parseFloat(this.value).toFixed(1)">
+        <div style="font-size:.75rem;color:#667;margin-top:2px">
+          Higher = faster playback. Crossing intervals are in hyperbolic distance units.
+        </div>
+      </div>
+    </div>
+    <div class="controls-actions">
+      <button id="horo-btn-play" onclick="playHoroAudio()" disabled>&#9654; Play</button>
+      <button id="horo-btn-stop-audio" class="stop" onclick="stopHoroAudio()" disabled>Stop Audio</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       Score player (shown after computation finishes)
+  ════════════════════════════════════════════════════════════════ -->
+  <div class="panel" id="horo-score-panel" style="display:none">
+    <div class="panel-title">Score</div>
+    <div class="controls-row" style="margin-bottom:10px">
+      <div class="controls-group">
+        <label>Speed &nbsp;<span class="val" id="horo-v-audiospeed2">10.0</span></label>
+        <input type="range" id="horo-audiospeed2" min="0.5" max="50" step="0.5" value="10"
+               oninput="document.getElementById('horo-v-audiospeed2').textContent=parseFloat(this.value).toFixed(1)">
+      </div>
+      <div class="controls-group">
+        <label>Time window &nbsp;<span class="val" id="horo-v-maxtime">300</span></label>
+        <input type="range" id="horo-maxtime" min="10" max="2000" step="10" value="300"
+               oninput="document.getElementById('horo-v-maxtime').textContent=this.value;if(mainPlayer)mainPlayer._updateUI()">
+      </div>
+    </div>
+    <div class="partiture-wrap">
+      <canvas id="horo-partiture" width="900" height="55"></canvas>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap">
+      <button id="horo-btn-play2" disabled onclick="mainPlayer.play()">&#9654; Play</button>
+      <button id="horo-btn-pause" disabled onclick="mainPlayer.pause()">&#9646;&#9646; Pause</button>
+      <input type="range" id="horo-seek" min="0" max="0" value="0" disabled
+             style="flex:1;min-width:80px">
+      <span id="horo-info" style="font-size:0.8rem;color:#a0b0c0;white-space:nowrap">—</span>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       Orthospectrum Estimation
+  ════════════════════════════════════════════════════════════════ -->
+  <div class="panel">
+    <div class="panel-title">Orthospectrum Estimation</div>
+    <p class="description" style="margin-bottom:12px">
+      Estimate the lengths of the shortest geodesic arcs perpendicular to the three marked curves
+      (the orthospectrum of the surface). Uses the empirical CDF of inter-note gap lengths
+      produced by the horocyclic flow. <strong>Run horocyclic flow first.</strong>
+    </p>
+
+    <div class="controls-actions" style="gap:8px;flex-wrap:wrap">
+      <button id="btn-orth" onclick="horoComputeNextOrthElement()" disabled>Estimate Next Element</button>
+      <button onclick="horoShowOrthInitialSum()">Show initial + sum</button>
+      <button onclick="if(typeof resetOrth==='function')resetOrth()">Reset</button>
+      <label style="font-size:.82rem;color:#aab;display:flex;align-items:center;gap:6px;margin:0">
+        Precision
+        <select id="orth-samples">
+          <option value="1000000" selected>Normal</option>
+          <option value="2000000">High</option>
+          <option value="5000000">Very High</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="status" id="orth-status" style="margin-top:8px">Run horocyclic flow first.</div>
+
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px">
+      <!-- Results table -->
+      <div style="flex:0 0 auto;min-width:200px">
+        <table id="orth-table" class="orth-table">
+          <thead><tr><th>#</th><th>Length</th><th>Prob %</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <!-- CDF chart -->
+      <div style="flex:1;min-width:280px">
+        <svg id="cdf-svg" viewBox="0 0 600 250" preserveAspectRatio="xMidYMid meet"
+             style="width:100%;height:auto;min-height:200px;background:#0a0a1a;border-radius:6px;border:1px solid #0f3460;display:block"></svg>
+        <svg id="barcode-svg" viewBox="0 0 600 80" preserveAspectRatio="xMidYMid meet"
+             style="width:100%;height:auto;background:#0a0a1a;border-radius:6px;border:1px solid #0f3460;margin-top:6px;display:block;min-height:55px"></svg>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       Curve-1 Intersection Distribution
+  ════════════════════════════════════════════════════════════════ -->
+  <div class="panel">
+    <div class="panel-title">Curve-1 Intersection Distribution</div>
+    <p class="description" style="margin-bottom:10px">
+      Each point is a crossing of the horocyclic trajectory with <strong>Curve 1</strong>.
+      X-axis: position along curve 1 (hyperbolic arc length).
+      Y-axis: intrinsic crossing angle between the horocycle and curve 1 (signed angle from geodesic tangent to horocycle tangent).
+      Colour encodes the inter-crossing time (log scale).
+      The orange dashed line shows the expected <em>uniform</em> position density
+      (predicted by unique ergodicity of the horocyclic flow).
+      <strong>Run horocyclic flow first.</strong>
+    </p>
+    <div class="status" id="horo-dist-status" style="margin-bottom:8px">Run horocyclic flow first.</div>
+    <!-- Scatter: position × ξ angle -->
+    <canvas id="horo-dist-canvas" width="900" height="360"
+            style="width:100%;height:auto;border-radius:6px;border:1px solid #0f3460;background:#0a0a1a;display:block"></canvas>
+    <!-- 1-D position histogram -->
+    <canvas id="horo-dist-hist" width="900" height="160"
+            style="width:100%;height:auto;border-radius:6px;border:1px solid #0f3460;background:#0a0a1a;display:block;margin-top:8px"></canvas>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       Motif Frequency Analysis
+  ════════════════════════════════════════════════════════════════ -->
+  <div class="panel">
+    <div class="panel-title">Motif Frequency Analysis</div>
+    <p class="description" style="margin-bottom:12px">
+      Scan the horocyclic music for recurring interval patterns.
+      <strong>Run horocyclic flow first.</strong>
+    </p>
+
+    <!-- 2-motif sub-panel -->
+    <div class="iso-sub-header" id="smotif2-hdr" onclick="toggleSubPanel('smotif2-hdr')">
+      2-Note Motif
+    </div>
+    <div class="iso-sub-body" id="smotif2-body">
+      <div class="controls-row" style="margin-bottom:8px">
+        <div class="controls-group">
+          <label>Gap a &nbsp;<span class="val" id="smotif2-v-a">0.50</span></label>
+          <input type="range" id="smotif2-a" min="0" max="5" step="0.01" value="0.5"
+                 oninput="document.getElementById('smotif2-v-a').textContent=parseFloat(this.value).toFixed(2)">
+          <div style="font-size:.72rem;color:#667;margin-top:2px">Min interval: <span id="smotif2-min">—</span></div>
+        </div>
+        <div class="controls-group">
+          <label>Tolerance &epsilon; &nbsp;<span class="val" id="smotif2-v-eps">0.10</span></label>
+          <input type="range" id="smotif2-eps" min="0.001" max="1" step="0.001" value="0.1"
+                 oninput="document.getElementById('smotif2-v-eps').textContent=parseFloat(this.value).toFixed(3)">
+        </div>
+        <div class="controls-group">
+          <label>Note 1 filter</label>
+          <select id="smotif2-n1">
+            <option value="0">Any</option>
+            <option value="1">Curve 1</option>
+            <option value="2">Curve 2</option>
+            <option value="3">Curve 3</option>
+          </select>
+          <label style="margin-top:6px">Note 2 filter</label>
+          <select id="smotif2-n2">
+            <option value="0">Any</option>
+            <option value="1">Curve 1</option>
+            <option value="2">Curve 2</option>
+            <option value="3">Curve 3</option>
+          </select>
+        </div>
+      </div>
+      <div class="controls-actions">
+        <button onclick="runHoroMotif2()">Scan 2-motif</button>
+      </div>
+      <div id="smotif2-status" class="status"></div>
+      <div id="smotif2-results" style="display:none">
+        <div id="smotif2-plot-wrap" style="margin-top:8px">
+          <canvas id="smotif2-canvas" width="860" height="180"
+                  style="width:100%;border:1px solid #0f3460;border-radius:4px;background:#0a0a1a"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3-motif sub-panel -->
+    <div class="iso-sub-header" id="smotif3-hdr" style="margin-top:10px" onclick="toggleSubPanel('smotif3-hdr')">
+      3-Note Motif
+    </div>
+    <div class="iso-sub-body" id="smotif3-body">
+      <div class="controls-row" style="margin-bottom:8px">
+        <div class="controls-group">
+          <label>Gap a &nbsp;<span class="val" id="smotif3-v-a">0.50</span></label>
+          <input type="range" id="smotif3-a" min="0" max="5" step="0.01" value="0.5"
+                 oninput="document.getElementById('smotif3-v-a').textContent=parseFloat(this.value).toFixed(2)">
+          <label style="margin-top:6px">Gap b &nbsp;<span class="val" id="smotif3-v-b">0.50</span></label>
+          <input type="range" id="smotif3-b" min="0" max="5" step="0.01" value="0.5"
+                 oninput="document.getElementById('smotif3-v-b').textContent=parseFloat(this.value).toFixed(2)">
+          <div style="font-size:.72rem;color:#667;margin-top:2px">Min interval: <span id="smotif3-min">—</span></div>
+        </div>
+        <div class="controls-group">
+          <label>Tolerance &epsilon; &nbsp;<span class="val" id="smotif3-v-eps">0.10</span></label>
+          <input type="range" id="smotif3-eps" min="0.001" max="1" step="0.001" value="0.1"
+                 oninput="document.getElementById('smotif3-v-eps').textContent=parseFloat(this.value).toFixed(3)">
+        </div>
+        <div class="controls-group">
+          <label>Note 1</label>
+          <select id="smotif3-n1">
+            <option value="0">Any</option>
+            <option value="1">Curve 1</option>
+            <option value="2">Curve 2</option>
+            <option value="3">Curve 3</option>
+          </select>
+          <label style="margin-top:4px">Note 2</label>
+          <select id="smotif3-n2">
+            <option value="0">Any</option>
+            <option value="1">Curve 1</option>
+            <option value="2">Curve 2</option>
+            <option value="3">Curve 3</option>
+          </select>
+          <label style="margin-top:4px">Note 3</label>
+          <select id="smotif3-n3">
+            <option value="0">Any</option>
+            <option value="1">Curve 1</option>
+            <option value="2">Curve 2</option>
+            <option value="3">Curve 3</option>
+          </select>
+        </div>
+      </div>
+      <div class="controls-actions">
+        <button onclick="runHoroMotif3()">Scan 3-motif</button>
+      </div>
+      <div id="smotif3-status" class="status"></div>
+      <div id="smotif3-results" style="display:none">
+        <div id="smotif3-plot-wrap" style="margin-top:8px">
+          <canvas id="smotif3-canvas" width="860" height="180"
+                  style="width:100%;border:1px solid #0f3460;border-radius:4px;background:#0a0a1a"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════════════
+       Compare Two Surfaces
+  ════════════════════════════════════════════════════════════════ -->
+  <div class="panel">
+    <div class="panel-title">Compare Two Surfaces</div>
+    <p class="description" style="margin-bottom:14px">
+      Generate horocyclic music for two independent surfaces (fast mode, 3000 crossings each)
+      and compare their motif frequencies.
+    </p>
+
+    <!-- Surface parameter boxes -->
+    <div class="cmp-surfaces-grid">
+
+      <!-- Surface A -->
+      <div class="cmp-surface-box">
+        <div class="group-title">Surface A</div>
+        <label>Pants decomposition</label>
+        <select id="cmp-a-gluing" style="width:100%;margin-bottom:6px">
+          <option value="separating">With Separating Component</option>
+          <option value="nonseparating">No Separating Component</option>
+        </select>
+        <label>L1 <span class="val" id="cmp-a-v-l1">2.00</span></label>
+        <input type="range" id="cmp-a-l1" min="1" max="7" step="0.01" value="2"
+               oninput="document.getElementById('cmp-a-v-l1').textContent=parseFloat(this.value).toFixed(2)">
+        <label>L2 <span class="val" id="cmp-a-v-l2">3.00</span></label>
+        <input type="range" id="cmp-a-l2" min="1" max="7" step="0.01" value="3"
+               oninput="document.getElementById('cmp-a-v-l2').textContent=parseFloat(this.value).toFixed(2)">
+        <label>L3 <span class="val" id="cmp-a-v-l3">4.00</span></label>
+        <input type="range" id="cmp-a-l3" min="1" max="7" step="0.01" value="4"
+               oninput="document.getElementById('cmp-a-v-l3').textContent=parseFloat(this.value).toFixed(2)">
+        <label style="margin-top:6px">T1 <span class="val" id="cmp-a-v-t1">0%</span></label>
+        <input type="range" id="cmp-a-t1" min="0" max="100" step="0.5" value="0"
+               oninput="document.getElementById('cmp-a-v-t1').textContent=Math.round(this.value)+'%'">
+        <label>T2 <span class="val" id="cmp-a-v-t2">0%</span></label>
+        <input type="range" id="cmp-a-t2" min="0" max="100" step="0.5" value="0"
+               oninput="document.getElementById('cmp-a-v-t2').textContent=Math.round(this.value)+'%'">
+        <label>T3 <span class="val" id="cmp-a-v-t3">0%</span></label>
+        <input type="range" id="cmp-a-t3" min="0" max="100" step="0.5" value="0"
+               oninput="document.getElementById('cmp-a-v-t3').textContent=Math.round(this.value)+'%'">
+        <div style="margin-top:8px">
+          <div class="checkbox-row">
+            <input type="checkbox" id="cmp-a-curve1" checked>
+            <span style="display:inline-block;width:10px;height:10px;background:#964;border-radius:2px;vertical-align:middle;margin:0 4px 0 3px"></span>
+            <label for="cmp-a-curve1">Curve 1</label>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="cmp-a-curve2" checked>
+            <span style="display:inline-block;width:10px;height:10px;background:#806;border-radius:2px;vertical-align:middle;margin:0 4px 0 3px"></span>
+            <label for="cmp-a-curve2">Curve 2</label>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="cmp-a-curve3" checked>
+            <span style="display:inline-block;width:10px;height:10px;background:#555;border-radius:2px;vertical-align:middle;margin:0 4px 0 3px"></span>
+            <label for="cmp-a-curve3">Curve 3</label>
+          </div>
+        </div>
+        <div class="controls-actions" style="margin-top:10px">
+          <button onclick="runHoroCompare('a')">Generate A</button>
+        </div>
+        <div id="cmp-status-a" class="status"></div>
+      </div>
+
+      <!-- Surface B -->
+      <div class="cmp-surface-box">
+        <div class="group-title">Surface B</div>
+        <label>Pants decomposition</label>
+        <select id="cmp-b-gluing" style="width:100%;margin-bottom:6px">
+          <option value="separating">With Separating Component</option>
+          <option value="nonseparating">No Separating Component</option>
+        </select>
+        <label>L1 <span class="val" id="cmp-b-v-l1">2.00</span></label>
+        <input type="range" id="cmp-b-l1" min="1" max="7" step="0.01" value="2"
+               oninput="document.getElementById('cmp-b-v-l1').textContent=parseFloat(this.value).toFixed(2)">
+        <label>L2 <span class="val" id="cmp-b-v-l2">3.00</span></label>
+        <input type="range" id="cmp-b-l2" min="1" max="7" step="0.01" value="3"
+               oninput="document.getElementById('cmp-b-v-l2').textContent=parseFloat(this.value).toFixed(2)">
+        <label>L3 <span class="val" id="cmp-b-v-l3">4.00</span></label>
+        <input type="range" id="cmp-b-l3" min="1" max="7" step="0.01" value="4"
+               oninput="document.getElementById('cmp-b-v-l3').textContent=parseFloat(this.value).toFixed(2)">
+        <label style="margin-top:6px">T1 <span class="val" id="cmp-b-v-t1">0%</span></label>
+        <input type="range" id="cmp-b-t1" min="0" max="100" step="0.5" value="0"
+               oninput="document.getElementById('cmp-b-v-t1').textContent=Math.round(this.value)+'%'">
+        <label>T2 <span class="val" id="cmp-b-v-t2">0%</span></label>
+        <input type="range" id="cmp-b-t2" min="0" max="100" step="0.5" value="0"
+               oninput="document.getElementById('cmp-b-v-t2').textContent=Math.round(this.value)+'%'">
+        <label>T3 <span class="val" id="cmp-b-v-t3">0%</span></label>
+        <input type="range" id="cmp-b-t3" min="0" max="100" step="0.5" value="0"
+               oninput="document.getElementById('cmp-b-v-t3').textContent=Math.round(this.value)+'%'">
+        <div style="margin-top:8px">
+          <div class="checkbox-row">
+            <input type="checkbox" id="cmp-b-curve1" checked>
+            <span style="display:inline-block;width:10px;height:10px;background:#964;border-radius:2px;vertical-align:middle;margin:0 4px 0 3px"></span>
+            <label for="cmp-b-curve1">Curve 1</label>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="cmp-b-curve2" checked>
+            <span style="display:inline-block;width:10px;height:10px;background:#806;border-radius:2px;vertical-align:middle;margin:0 4px 0 3px"></span>
+            <label for="cmp-b-curve2">Curve 2</label>
+          </div>
+          <div class="checkbox-row">
+            <input type="checkbox" id="cmp-b-curve3" checked>
+            <span style="display:inline-block;width:10px;height:10px;background:#555;border-radius:2px;vertical-align:middle;margin:0 4px 0 3px"></span>
+            <label for="cmp-b-curve3">Curve 3</label>
+          </div>
+        </div>
+        <div class="controls-actions" style="margin-top:10px">
+          <button onclick="runHoroCompare('b')">Generate B</button>
+        </div>
+        <div id="cmp-status-b" class="status"></div>
+      </div>
+    </div>
+
+    <!-- Playback for both surfaces -->
+    <div style="margin-top:14px">
+      <div class="controls-row" style="margin-bottom:8px">
+        <div class="controls-group">
+          <label>Speed &nbsp;<span class="val" id="cmp-v-speed">10.0</span></label>
+          <input type="range" id="cmp-speed" min="0.5" max="50" step="0.5" value="10"
+                 oninput="document.getElementById('cmp-v-speed').textContent=parseFloat(this.value).toFixed(1)">
+        </div>
+        <div class="controls-group">
+          <label>Time window &nbsp;<span class="val" id="cmp-v-maxtime">300</span></label>
+          <input type="range" id="cmp-maxtime" min="10" max="2000" step="10" value="300"
+                 oninput="document.getElementById('cmp-v-maxtime').textContent=this.value;if(cmpPlayerA)cmpPlayerA._updateUI();if(cmpPlayerB)cmpPlayerB._updateUI()">
+        </div>
+      </div>
+
+      <!-- Surface A player -->
+      <div style="margin-bottom:10px">
+        <div style="font-size:0.78rem;color:#c9a96e;font-weight:700;margin-bottom:4px">Surface A</div>
+        <div class="partiture-wrap">
+          <canvas id="cmp-partiture-a" width="900" height="55"></canvas>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">
+          <button id="cmp-btn-play-a" disabled onclick="cmpPlayerA.play()">&#9654; Play A</button>
+          <button id="cmp-btn-pause-a" disabled onclick="cmpPlayerA.pause()">&#9646;&#9646; Pause</button>
+          <input type="range" id="cmp-seek-a" min="0" max="0" value="0" disabled style="flex:1;min-width:60px">
+          <span id="cmp-info-a" style="font-size:0.78rem;color:#a0b0c0;white-space:nowrap">—</span>
+        </div>
+      </div>
+
+      <!-- Surface B player -->
+      <div>
+        <div style="font-size:0.78rem;color:#7fc0e8;font-weight:700;margin-bottom:4px">Surface B</div>
+        <div class="partiture-wrap">
+          <canvas id="cmp-partiture-b" width="900" height="55"></canvas>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap">
+          <button id="cmp-btn-play-b" disabled onclick="cmpPlayerB.play()">&#9654; Play B</button>
+          <button id="cmp-btn-pause-b" disabled onclick="cmpPlayerB.pause()">&#9646;&#9646; Pause</button>
+          <input type="range" id="cmp-seek-b" min="0" max="0" value="0" disabled style="flex:1;min-width:60px">
+          <span id="cmp-info-b" style="font-size:0.78rem;color:#a0b0c0;white-space:nowrap">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Motif comparison sub-panel -->
+    <div class="iso-sub-header" id="cmp2-hdr" style="margin-top:14px" onclick="toggleSubPanel('cmp2-hdr')">
+      Motif Comparison
+    </div>
+    <div class="iso-sub-body" id="cmp2-body">
+      <div style="margin-bottom:8px;display:flex;gap:16px;align-items:center;font-size:0.82rem">
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+          <input type="radio" name="cmp2-mode" value="2" checked> 2-note motif
+        </label>
+        <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+          <input type="radio" name="cmp2-mode" value="3"> 3-note motif
+        </label>
+      </div>
+      <div class="controls-row" style="margin-bottom:8px">
+        <div class="controls-group">
+          <label>Gap a &nbsp;<span class="val" id="cmp2-v-a">0.50</span></label>
+          <input type="range" id="cmp2-a" min="0" max="5" step="0.01" value="0.5"
+                 oninput="document.getElementById('cmp2-v-a').textContent=parseFloat(this.value).toFixed(2)">
+          <label style="margin-top:6px">Gap b (3-motif) &nbsp;<span class="val" id="cmp2-v-b">0.50</span></label>
+          <input type="range" id="cmp2-b" min="0" max="5" step="0.01" value="0.5"
+                 oninput="document.getElementById('cmp2-v-b').textContent=parseFloat(this.value).toFixed(2)">
+        </div>
+        <div class="controls-group">
+          <label>Tolerance &epsilon; &nbsp;<span class="val" id="cmp2-v-eps">0.10</span></label>
+          <input type="range" id="cmp2-eps" min="0.001" max="1" step="0.001" value="0.1"
+                 oninput="document.getElementById('cmp2-v-eps').textContent=parseFloat(this.value).toFixed(3)">
+        </div>
+        <div class="controls-group">
+          <label>Note 1</label>
+          <select id="cmp2-n1">
+            <option value="0">Any</option>
+            <option value="1">Curve 1</option>
+            <option value="2">Curve 2</option>
+            <option value="3">Curve 3</option>
+          </select>
+          <label style="margin-top:4px">Note 2</label>
+          <select id="cmp2-n2">
+            <option value="0">Any</option>
+            <option value="1">Curve 1</option>
+            <option value="2">Curve 2</option>
+            <option value="3">Curve 3</option>
+          </select>
+          <label style="margin-top:4px">Note 3 (3-motif)</label>
+          <select id="cmp2-n3">
+            <option value="0">Any</option>
+            <option value="1">Curve 1</option>
+            <option value="2">Curve 2</option>
+            <option value="3">Curve 3</option>
+          </select>
+        </div>
+      </div>
+      <div class="controls-actions">
+        <button onclick="runCmpMotifAnalysis()">Run motif analysis</button>
+      </div>
+      <pre id="cmp2-results" class="results-pre" style="display:none"></pre>
+      <div id="cmp2-plot-wrap" style="display:none;margin-top:8px">
+        <canvas id="cmp2-canvas" width="860" height="180"
+                style="width:100%;border:1px solid #0f3460;border-radius:4px;background:#0a0a1a"></canvas>
+        <div style="display:flex;gap:16px;font-size:0.75rem;margin-top:4px">
+          <span><span style="display:inline-block;width:20px;height:3px;background:#c9a96e;vertical-align:middle;border-radius:2px"></span> Surface A</span>
+          <span><span style="display:inline-block;width:20px;height:3px;background:#7fc0e8;vertical-align:middle;border-radius:2px"></span> Surface B</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /app-container -->
+
+<script src="../webapp/js/geometry.js"></script>
+<script src="../webapp/js/hexagons.js"></script>
+<script src="../webapp/js/drawing.js"></script>
+<script src="../webapp/js/geodesic.js"></script>
+<script src="../webapp/js/audio.js"></script>
+<script src="js/horocycle.js"></script>
+<script src="../webapp/js/motifs.js"></script>
+<script src="../webapp/js/charts.js"></script>
+<script src="../webapp/js/orthospectrum.js"></script>
+<script src="js/horostory.js"></script>
+
+</body>
+</html>
