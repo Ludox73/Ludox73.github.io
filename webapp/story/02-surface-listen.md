@@ -1,0 +1,1 @@
+Here you see the _score_ of the melody: each vertical segment represent one intersection of the geodesic with the component of $\Gamma$ of the corresponding color. You can modify the length of the score that is being visualized and select the speed at which the music is reproduced. You can also modify the starting time if you wish.
