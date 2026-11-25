@@ -112,6 +112,10 @@ dialog .field-status:not(:empty){margin-top:10px}
 .cover-comparison tr>:first-child{text-align:left}
 .cover-comparison tbody td:last-child{color:var(--teal)}
 #cover-disk{cursor:pointer}
+.cover-disk-plot{overflow:hidden}
+#cover-disk.zoomed{cursor:grab;touch-action:none}
+#cover-disk.zoomed:active{cursor:grabbing}
+#cover-orthosystole-translate{border-color:#467064;color:#a7e4d2}
 #cover-vector{cursor:grab;touch-action:none}
 #cover-vector:active{cursor:grabbing}
 .cover-handle{position:absolute;z-index:1;width:24px;min-height:24px;padding:0;transform:translate(-50%,-50%);border:0;border-radius:50%;background:transparent;touch-action:none;cursor:grab}
@@ -133,6 +137,11 @@ dialog .field-status:not(:empty){margin-top:10px}
   .cover-panels{grid-template-columns:1fr}
   .cover-panels .plot-box{height:clamp(240px,80vw,340px)}
 }
+
+.threshold-controls{display:grid;grid-template-columns:1fr auto;gap:.2rem .8rem;grid-column:1/-1}
+.threshold-controls input,.threshold-controls small{grid-column:1/-1;width:100%}
+.threshold-controls output{color:#9cf4b5;font-variant-numeric:tabular-nums}
+.threshold-controls input[type=range]{accent-color:#9cf4b5}
 
 </style>
 </head>
@@ -187,7 +196,7 @@ dialog .field-status:not(:empty){margin-top:10px}
       <div class="area-readout" role="group" aria-labelledby="area-title">
         <div class="area-heading">
           <h3 id="area-title">Area share</h3>
-          <span id="area-region">A⁺</span>
+          <span id="area-region">Entire section</span>
           <div class="area-info">
             <button id="area-info" class="info" type="button" aria-label="How area share is calculated" aria-describedby="area-explanation">i</button>
             <div class="area-tooltip" id="area-explanation" role="tooltip">
@@ -206,6 +215,12 @@ dialog .field-status:not(:empty){margin-top:10px}
       <div class="panel-head"><h2>Intersection section</h2><span class="math-badge">T¹X|<sub>γ</sub></span></div>
       <div class="plot-box"><canvas id="section" role="img" aria-describedby="point-help" aria-label="Crossings plotted by position on gamma, outgoing angle, and time to the next return"></canvas><div id="probe-ring" hidden></div><div id="drag-box" hidden></div></div>
       <div class="panel-foot section-foot">
+        <div class="threshold-controls">
+          <label for="return-threshold">Highlight returns before x</label>
+          <output id="threshold-value" for="return-threshold">Off</output>
+          <input id="return-threshold" type="range" min="0" max="20" step="0.02" value="0" aria-describedby="threshold-area">
+          <small id="threshold-area">Move the slider to shade the full section where r₁(v) &lt; x.</small>
+        </div>
         <div class="return-key" aria-label="Logarithmic scale in geodesic time units">
           <div class="return-caption"><span>Time to next γ · log scale</span><span class="pending-key">Awaiting return</span></div>
           <div id="time-gradient"></div>
@@ -216,7 +231,7 @@ dialog .field-status:not(:empty){margin-top:10px}
         <div class="section-controls">
           <div class="region-controls"><label for="class-choice">Region</label>
             <select id="class-choice" aria-label="Highlighted region">
-              <option value="0">Entire section</option><option value="1" selected>A⁺ · via C₃</option><option value="2">A⁻ · via C₃</option>
+              <option value="0" selected>Entire section</option><option value="1">A⁺ · via C₃</option><option value="2">A⁻ · via C₃</option>
               <option value="3">B⁺ · via C₂</option><option value="4">B⁻ · via C₂</option><option value="5">Four short classes</option><option value="6">Custom box</option>
             </select><button type="button" id="edit-box" hidden>Edit bounds</button>
           </div>
@@ -258,7 +273,7 @@ dialog .field-status:not(:empty){margin-top:10px}
   <div class="panels cover-panels" id="cover-panels" hidden>
     <section class="panel" aria-labelledby="cover-title">
       <div class="panel-head"><h2 id="cover-title">Universal cover</h2><span class="math-badge">ℍ²</span></div>
-      <div class="plot-box">
+      <div class="plot-box cover-disk-plot" id="cover-disk-plot">
         <canvas id="cover-disk" role="img" aria-label="First-return lifts of gamma in the Poincaré disk, with the preferred lift vertical" aria-describedby="cover-help"></canvas>
         <button type="button" id="cover-from" class="cover-handle" aria-label="Departure endpoint on the central lift" aria-describedby="cover-help"></button>
         <button type="button" id="cover-to" class="cover-handle arrival" aria-label="Arrival endpoint on the selected lift" aria-describedby="cover-help"></button>
@@ -268,6 +283,16 @@ dialog .field-status:not(:empty){margin-top:10px}
           <span class="key coral">Preferred lift γ̃</span><span class="key gold">Selected lift</span>
           <span class="key translate">Period translates</span>
         </div>
+        <div class="cover-actions cover-view-buttons" role="group" aria-label="Cover disk view">
+          <button type="button" id="cover-disk-zoom-out" aria-label="Zoom out on the cover disk" disabled>−</button>
+          <button type="button" id="cover-disk-zoom-in" aria-label="Zoom in on the cover disk">+</button>
+          <button type="button" id="cover-disk-reset" disabled>Reset disk</button>
+          <button type="button" id="cover-more-lifts" title="Show additional first-return lifts closer to the rim">More lifts</button>
+        </div>
+        <div class="cover-actions">
+          <button type="button" id="cover-orthosystole-translate" title="Zoom to the common perpendicular translated by +ℓ(γ)">Orthosystole translate</button>
+          <span class="cover-muted" id="cover-disk-status"></span>
+        </div>
         <div class="cover-actions">
           <label for="cover-lift">Other lift</label><select id="cover-lift" aria-label="Select another lift of gamma"></select>
           <button type="button" id="cover-orthogonal" title="Set the endpoints at the feet of the common perpendicular">Common perpendicular</button>
@@ -276,9 +301,9 @@ dialog .field-status:not(:empty){margin-top:10px}
           <span>Translate</span>
           <button type="button" id="cover-translate-down" aria-label="Translate the segment down by one period">−ℓ(γ)</button>
           <button type="button" id="cover-translate-up" aria-label="Translate the segment up by one period">+ℓ(γ)</button>
-          <span class="cover-muted" id="cover-disk-center">Disk center s = 0</span>
+          <span class="cover-muted" id="cover-disk-center">Disk origin s = 0</span>
         </div>
-        <p class="cover-help" id="cover-help">Click a first-return lift. Drag either endpoint or focus it and use the arrow keys.</p>
+        <p class="cover-help" id="cover-help">Scroll to zoom and drag the disk to pan. Click a lift, then drag either endpoint or use its arrow keys.</p>
       </div>
     </section>
     <section class="panel" aria-labelledby="cover-vector-title">
@@ -1611,7 +1636,7 @@ class ReturnStatistics {
 
 "use strict";
 const SeminarPlots=(()=>{
-  const C={bg:"#131b25",line:"#354452",grid:"#2a3745",muted:"#a7b5c2",gold:"#ebbc73",teal:"#65d7bc",coral:"#e58c78",blue:"#82b4ef",lilac:"#b7a9e3"};
+  const C={bg:"#131b25",line:"#354452",grid:"#2a3745",muted:"#a7b5c2",gold:"#ebbc73",teal:"#65d7bc",coral:"#e58c78",blue:"#82b4ef",lilac:"#b7a9e3",threshold:"#9cf4b5"};
   const F=SeminarFlow, pi=Math.PI;
   // Equally spaced in log time at 0.5, 2, 8, 32 and 128 units.
   const stops=[[150,125,222],[83,158,224],[66,199,189],[177,216,117],[255,226,124]];
@@ -1767,14 +1792,62 @@ const SeminarPlots=(()=>{
     layer.width=source.width;layer.height=source.height;
     return layer;
   }
-  function section(canvas,stats,n,group,area,view=null) {
+  // Each raster cell samples the geometric first return, independently of playback.
+  const thresholdGrids=new WeakMap();
+  function returnGrid(surface,view){
+    let cache=thresholdGrids.get(surface);
+    if(!cache){cache=new Map();thresholdGrids.set(surface,cache);}
+    if(cache.has(view))return cache.get(view);
+    const d=view??fullSection(surface.lengths[0]),cols=320,rows=200;
+    const times=new Float64Array(cols*rows).fill(Infinity), weights=[];
+    for(let row=0;row<rows;row++){
+      const a=d.y1-(d.y1-d.y0)*row/rows,b=d.y1-(d.y1-d.y0)*(row+1)/rows;
+      weights.push(Math.abs(Math.cos(a)-Math.cos(b)));
+      for(let col=0;col<cols;col++){
+        const s=d.x0+(d.x1-d.x0)*(col+.5)/cols;
+        const theta=(a+b)/2;
+        if(!theta)continue;
+        let state=surface.fromSection(s,theta);
+        do{state=surface.advance(state);}while(state.side!==0&&state.t<20);
+        if(state.side===0)times[row*cols+col]=state.t;
+      }
+    }
+    const layer=document.createElement("canvas");layer.width=cols;layer.height=rows;
+    const grid={cols,rows,times,weights,layer,lastX:null,share:0};
+    if(view)for(const key of cache.keys())if(key)cache.delete(key);
+    cache.set(view,grid);return grid;
+  }
+  function thresholdLayer(grid,value){
+    if(grid.lastX===value)return;
+    const {cols,rows,layer,times,weights}=grid,ctx=layer.getContext("2d");
+    ctx.clearRect(0,0,cols,rows);ctx.fillStyle=C.threshold;
+    let mass=0;
+    for(let row=0;row<rows;row++){
+      let start=-1;
+      for(let col=0;col<=cols;col++){
+        if(col<cols&&times[row*cols+col]<value){
+          if(start<0)start=col;
+        }else if(start>=0){
+          ctx.fillRect(start,row,col-start,1);mass+=(col-start)*weights[row];start=-1;
+        }
+      }
+    }
+    grid.share=mass/(4*cols);grid.lastX=value;
+  }
+  function section(canvas,stats,n,group,area,view=null,threshold=0) {
     const {orbit,labels}=stats;
     const {ctx,w,h}=context(canvas),box=bounds(w,h);
     const domain=view??fullSection(orbit.surface.lengths[0]),completed=Math.max(0,n-1);
+    let thresholdShare=null;
     const yTicks=view?ticksBetween(domain.y0,domain.y1).map(theta=>[theta,angleLabel(theta)]):angleTicks;
     const {x,y}=axes(ctx,box,domain,ticksBetween(domain.x0,domain.x1),yTicks,"Position s on γ","");
     text(ctx,"θ",box.l-27,box.top+3);
-    if(area){
+    if(threshold>0){
+      const full=returnGrid(orbit.surface,null),drawing=view?returnGrid(orbit.surface,view):full;
+      thresholdLayer(full,threshold);thresholdLayer(drawing,threshold);
+      ctx.save();ctx.globalAlpha=.65;ctx.imageSmoothingEnabled=true;ctx.drawImage(drawing.layer,box.l,box.top,box.r-box.l,box.b-box.top);ctx.restore();
+      thresholdShare=full.share;
+    }else if(area){
       ctx.save();clipPlot(ctx,box);
       const left=x(area.s0),top=y(area.a1),width=x(area.s1)-left,height=y(area.a0)-top;
       ctx.fillStyle="#53ceb436";ctx.fillRect(left,top,width,height);
@@ -1823,6 +1896,7 @@ const SeminarPlots=(()=>{
     ctx.save();clipPlot(ctx,box);
     for(let i=0;i<layers.length;i++){
       ctx.globalAlpha=group&&i===0?outsideOpacity:1;
+      if(threshold>0)ctx.globalAlpha*=.22;
       ctx.drawImage(layers[i],0,0,w,h);
     }
     if(completed>0){
@@ -1838,6 +1912,7 @@ const SeminarPlots=(()=>{
       ctx.fillStyle=C.bg;ctx.fill();ctx.strokeStyle="#f4ece0";ctx.lineWidth=1.8;ctx.stroke();
     }
     ctx.restore();
+    return thresholdShare;
   }
   function picked(canvas,event,length,view=null,clampToPlot=false) {
     const rect=canvas.getBoundingClientRect(), box=bounds(rect.width,rect.height);
@@ -1885,7 +1960,55 @@ const SeminarPlots=(()=>{
     return best;
   }
 
-  function distribution(canvas,stats,n,group,limit,models) {
+  function weightedReturnShares({times,cols,weights}){
+    const order=Uint32Array.from(times.keys()).sort((a,b)=>times[a]-times[b]);
+    const sums=new Float64Array(order.length+1);
+    for(let i=0;i<order.length;i++)sums[i+1]=sums[i]+weights[Math.floor(order[i]/cols)];
+    return value=>{
+      let lo=0,hi=order.length;
+      while(lo<hi){
+        const mid=(lo+hi)>>>1;
+        if(times[order[mid]]<value)lo=mid+1;
+        else hi=mid;
+      }
+      return sums[lo]/(4*cols);
+    };
+  }
+  function thresholdFill(ctx,x,y,surface,{value,share}){
+    const grid=returnGrid(surface,null);
+    grid.shareAt??=weightedReturnShares(grid);
+    const steps=Math.ceil(value/.02),points=[[x(0),y(0)]];
+    for(let i=1;i<steps;i++){
+      const t=value*i/steps;
+      points.push([x(t),y(grid.shareAt(t))]);
+    }
+    points.push([x(value),y(share)]);
+    ctx.beginPath();ctx.moveTo(...points[0]);
+    for(const point of points.slice(1))ctx.lineTo(...point);
+    ctx.lineTo(x(value),y(0));ctx.closePath();
+    ctx.fillStyle=C.threshold+"24";ctx.fill();
+    path(ctx,points,C.threshold,1.3);
+  }
+  function thresholdMarker(ctx,box,x,y,{value,share,label}){
+    const a=x(value),b=y(share);
+    ctx.save();
+    ctx.globalAlpha=.75;ctx.setLineDash([3,3]);
+    line(ctx,a,box.b,a,b,C.threshold);
+    line(ctx,box.l,b,a,b,C.threshold);
+    ctx.globalAlpha=1;ctx.setLineDash([]);
+    ctx.beginPath();ctx.arc(a,b,4,0,2*pi);ctx.fillStyle=C.threshold;ctx.fill();
+    ctx.lineWidth=1.4;ctx.strokeStyle=C.bg;ctx.stroke();
+
+    const caption="Weighted area ≈ "+label;
+    ctx.font="600 11px system-ui, sans-serif";
+    const pad=6,width=ctx.measureText(caption).width+2*pad,height=21;
+    const left=clamp(a+width+8<=box.r?a+8:a-8-width,box.l,Math.max(box.l,box.r-width));
+    const top=b-box.top>=height+6?b-height-6:b+6;
+    ctx.fillStyle=C.bg;ctx.fillRect(left,top,width,height);
+    text(ctx,caption,left+pad,top+14,"left",C.threshold);
+    ctx.restore();
+  }
+  function distribution(canvas,stats,n,group,limit,models,threshold=null) {
     const {ctx,w,h}=context(canvas),box=bounds(w,h);box.l=46;
     const bins=320, width=bins+1;
     const hist=stats.histogram(n,limit,bins), total=[],selected=[],subtracted=[],residual=[];
@@ -1909,7 +2032,12 @@ const SeminarPlots=(()=>{
     const yt=[[0,"0"],[.25,".25"],[.5,".5"],[.75,".75"],[1,"1"]];
     if(low<0)yt.unshift([low,low.toFixed(1)]);if(high>1)yt.push([high,high.toFixed(1)]);
     const {x,y}=axes(ctx,box,{x0:0,x1:limit,y0:low,y1:high},ticksBetween(0,limit),yt,"Return-time threshold t","Probability");
-    if(!n){text(ctx,"Awaiting first return",(box.l+box.r)/2,(box.b+box.top)/2);return;}
+    if(threshold)thresholdFill(ctx,x,y,stats.orbit.surface,threshold);
+    if(!n){
+      if(threshold)thresholdMarker(ctx,box,x,y,threshold);
+      else text(ctx,"Awaiting first return",(box.l+box.r)/2,(box.b+box.top)/2);
+      return;
+    }
     const early=n<400?Array.from({length:n},(_,i)=>i).sort((a,b)=>stats.gaps[a]-stats.gaps[b]):null;
     function curve(values,color,dashed=false,filter=null,shade=false) {
       let points=[];
@@ -1929,13 +2057,14 @@ const SeminarPlots=(()=>{
     }
     if(group&&!showFit){
       curve(total.map((v,j)=>v-selected[j]),"#a2b2bf",true,c=>!isSelected(c,group));
-      curve(selected,C.teal,false,c=>isSelected(c,group),true);
+      curve(selected,C.teal,false,c=>isSelected(c,group),!threshold);
     }
     curve(total,C.gold,false,()=>true);
     if(showFit){
       curve(residual,C.blue);
       curve(subtracted,C.lilac,true);
     }
+    if(threshold)thresholdMarker(ctx,box,x,y,threshold);
   }
   function ticks(canvas,orbit,min,max){
     const {ctx,w,h}=context(canvas);
@@ -1951,8 +2080,8 @@ const SeminarPlots=(()=>{
 
 "use strict";
 const CoverGeometry=(()=>{
-  const endpointLimit=5.5;
-  const displayRadius=5.15;
+  const endpointLimit=10;
+  const defaultRadius=5.15;
   const clamp=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
   const dot=(a,b)=>-a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
   const euclideanDot=(a,b)=>a[0]*b[0]+a[1]*b[1]+a[2]*b[2];
@@ -2034,7 +2163,7 @@ const CoverGeometry=(()=>{
     });
     return {p,q,theta,length,arc};
   }
-  function build(surface) {
+  function build(surface,displayRadius=defaultRadius) {
     const edges=surface.edges,edge=edges[0],L=surface.lengths[0];
     const shortestSeam=surface.routes.reduce((a,b)=>a.length<b.length?a:b);
     const p=surface.onSide(0,shortestSeam.foot);
@@ -2053,15 +2182,17 @@ const CoverGeometry=(()=>{
     const visited=pointIndex(),distinct=pointIndex(),tiles=[origin],lifts=[];
     visited(project(apply(origin,center)));
     // In the zero-twist surface, each adjacent hexagon develops by reflection
-    // in its shared side. Every lift of γ is a wall of type 0. A radius from
-    // the origin reaches each visible tile through side segments in this ball.
+    // in its shared side. Stop at marked walls other than the central one.
+    // The two components adjacent to it are convex, so a radius from the
+    // origin reaches their visible tiles without crossing another marked wall.
     for(let i=0;i<tiles.length;i++){
       const tile=tiles[i],normal=apply(tile,edges[0].n);
-      if(Math.abs(normal[0])>1e-8 && Math.abs(normal[0])<=sinhRadius+1e-8){
+      const centralWall=Math.abs(normal[0])<=1e-8;
+      if(!centralWall && Math.abs(normal[0])<=sinhRadius+1e-8){
         const lift=liftFromNormal(normal);
         if(distinct(project(lift.p)))lifts.push(lift);
       }
-      for(let j=0;j<edges.length;j++){
+      for(let j=centralWall?0:1;j<edges.length;j++){
         const p0=euclideanDot(tile[0],edges[j].p),e0=euclideanDot(tile[0],edges[j].e);
         const t=clamp(-e0/p0,0,sideBounds[j]);
         const nearest=(p0+t*e0)/Math.sqrt(1-t*t);
@@ -2070,18 +2201,14 @@ const CoverGeometry=(()=>{
         if(visited(project(apply(next,center))))tiles.push(next);
       }
     }
-    // Lifts are disjoint. A lift blocks the target precisely when its far
-    // half-plane contains the target. Any blocker meets the same search ball
-    // along the radius from the origin to the target's closest point.
-    const direct=lifts.filter(target=>!lifts.some(lift=>lift!==target && dot(target.p,lift.normal)>1e-8));
-    direct.sort((a,b)=>a.p[0]-b.p[0]);
-    const first=Math.min(...direct.map(lift=>lift.distance));
-    const preferred=direct.reduce((best,lift)=>{
+    lifts.sort((a,b)=>a.p[0]-b.p[0]);
+    const first=Math.min(...lifts.map(lift=>lift.distance));
+    const preferred=lifts.reduce((best,lift)=>{
       if(lift.distance>first+1e-8)return best;
       if(!best||Math.abs(lift.foot)<Math.abs(best.foot)-1e-8)return lift;
       return Math.abs(Math.abs(lift.foot)-Math.abs(best.foot))<1e-8 && lift.normal[1]>best.normal[1]?lift:best;
     },null);
-    return {lifts:direct,first,preferred,radius};
+    return {lifts,first,preferred,radius};
   }
   return {central,build,point,parameter,perpendicular,shadow,segment,normalizedLift,translate};
 })();
@@ -2090,38 +2217,43 @@ const CoverGeometry=(()=>{
 const SeminarCover=(()=>{
   const G=CoverGeometry,{context,line,path,text,palette:C}=SeminarPlots;
   const pi=Math.PI;
+  const fullDisk={center:[0,0],scale:1},maxDiskZoom=1024;
+  const detailRadii=[undefined,6.4,7.4,8.4,9.2];
   const clamp=(value,lo,hi)=>Math.max(lo,Math.min(hi,value));
   const format=(value,digits=4)=>value===null?"—":(Math.abs(value)<.5*10**-digits?0:value).toFixed(digits);
 
-  function diskLayout(w,h) {
-    const x=w/2,y=h/2,radius=Math.max(1,Math.min(w,h)/2-14);
-    return {x,y,radius,toScreen:([u,v])=>[x+radius*u,y-radius*v]};
+  function diskLayout(w,h,view) {
+    const radius=Math.max(1,Math.min(w,h)/2-14)*view.scale;
+    const x=w/2-view.center[0]*radius,y=h/2+view.center[1]*radius;
+    return {x,y,w,h,radius,
+      toScreen:([u,v])=>[x+radius*u,y-radius*v],
+      fromScreen:([u,v])=>[(u-x)/radius,(y-v)/radius]};
   }
-  function diskFrame(canvas) {
-    const {ctx,w,h}=context(canvas),frame=diskLayout(w,h);
+  function diskFrame(canvas,view=fullDisk) {
+    const {ctx,w,h}=context(canvas),frame=diskLayout(w,h,view);
     ctx.beginPath();ctx.arc(frame.x,frame.y,frame.radius,0,2*pi);
     ctx.fillStyle="#101822";ctx.fill();
     ctx.lineWidth=1;ctx.strokeStyle="#516171";ctx.stroke();
     return {...frame,ctx};
   }
   function traceLift(frame,lift) {
-    const {ctx,toScreen,radius}=frame,[x,y]=toScreen(lift.center);
+    const {ctx,toScreen,radius,w,h}=frame,[x,y]=toScreen(lift.center),r=radius*lift.radius;
+    if(x+r<0||x-r>w||y+r<0||y-r>h)return;
     const angle=Math.atan2(lift.center[1],-lift.center[0]),start=angle-lift.halfAngle;
-    const r=radius*lift.radius;
     ctx.moveTo(x+r*Math.cos(start),y+r*Math.sin(start));
     ctx.arc(x,y,r,start,angle+lift.halfAngle);
   }
-  function fromPointer(canvas,event) {
-    const rect=canvas.getBoundingClientRect(),frame=diskLayout(rect.width,rect.height);
-    return [(event.clientX-rect.left-frame.x)/frame.radius,(frame.y-event.clientY+rect.top)/frame.radius];
+  function fromPointer(canvas,event,view) {
+    const rect=canvas.getBoundingClientRect(),frame=diskLayout(rect.width,rect.height,view);
+    return frame.fromScreen([event.clientX-rect.left,event.clientY-rect.top]);
   }
   function drawArrow(ctx,[x,y],theta) {
     const dx=Math.sin(theta),dy=-Math.cos(theta),tip=[x+22*dx,y+22*dy];
     line(ctx,x,y,...tip,C.gold,2);
     path(ctx,[[tip[0]-6*dx-3*dy,tip[1]-6*dy+3*dx],tip,[tip[0]-6*dx+3*dy,tip[1]-6*dy-3*dx]],C.gold,2);
   }
-  function drawCover(canvas,lifts,copies,selected,segment) {
-    const frame=diskFrame(canvas),{ctx,x,y,radius,toScreen}=frame;
+  function drawCover(canvas,view,lifts,copies,selected,segment,orthosystole) {
+    const frame=diskFrame(canvas,view),{ctx,x,y,radius,toScreen}=frame;
     ctx.save();ctx.beginPath();ctx.arc(x,y,radius,0,2*pi);ctx.clip();
     ctx.beginPath();
     for(const lift of lifts)traceLift(frame,lift);
@@ -2136,6 +2268,14 @@ const SeminarCover=(()=>{
       const p=toScreen(G.point(lift,0));
       ctx.beginPath();ctx.arc(...p,3,0,2*pi);ctx.fillStyle=C.teal;ctx.fill();
     }
+    if(orthosystole){
+      ctx.setLineDash([4,3]);ctx.beginPath();traceLift(frame,orthosystole.lift);
+      ctx.strokeStyle=C.teal;ctx.lineWidth=2;ctx.stroke();
+      path(ctx,orthosystole.arc.map(toScreen),C.teal,2.2);ctx.setLineDash([]);
+      for(const endpoint of [orthosystole.p,orthosystole.q]){
+        ctx.beginPath();ctx.arc(...toScreen(endpoint),2,0,2*pi);ctx.fillStyle=C.teal;ctx.fill();
+      }
+    }
     ctx.beginPath();traceLift(frame,selected);
     ctx.strokeStyle=C.gold;ctx.lineWidth=2.5;ctx.stroke();
     path(ctx,segment.arc.map(toScreen),C.gold,2.4);
@@ -2148,12 +2288,12 @@ const SeminarCover=(()=>{
     const {ctx,w,h}=context(canvas);
     const {l,r,top,b}=vectorBounds(w,h);
     const min=view.center-view.span/2,max=view.center+view.span/2;
-    const x=t=>l+(t-min)/view.span*(r-l);
+    const x=t=>l+(max-t)/view.span*(r-l);
     const y=a=>b-(a+pi)/(2*pi)*(b-top);
     ctx.font="11px system-ui, sans-serif";
     for(let i=0;i<=4;i++){
       const t=min+i*view.span/4;
-      line(ctx,x(t),top,x(t),b,C.grid);text(ctx,String(+t.toFixed(view.span<6?2:1)),x(t),b+16);
+      line(ctx,x(t),top,x(t),b,C.grid);text(ctx,String(+t.toPrecision(5)),x(t),b+16);
     }
     for(const [a,label] of [[-pi,"−π"],[-pi/2,"−π/2"],[0,"0"],[pi/2,"π/2"],[pi,"π"]]){
       line(ctx,l,y(a),r,y(a),C.grid);text(ctx,label,l-6,y(a)+4,"right");
@@ -2184,8 +2324,8 @@ const SeminarCover=(()=>{
     const first=Math.ceil((min-tail-foot)/periodLength),last=Math.floor((max+tail-foot)/periodLength);
     for(let copy=first;copy<=last;copy++)if(copy)band(copy,false);
     band(0,true);
-    if(s>=min && s<=max){
-      const px=x(s),py=y(theta);
+    if(s>=min-1e-9 && s<=max+1e-9){
+      const px=x(clamp(s,min,max)),py=y(theta);
       ctx.setLineDash([4,4]);
       line(ctx,px,b,px,py,"#e7c9909b");line(ctx,l,py,px,py,"#e7c9909b");
       ctx.setLineDash([]);
@@ -2233,34 +2373,94 @@ const SeminarCover=(()=>{
     const select=$("cover-lift"),departure=$("cover-from"),arrival=$("cover-to");
     const developments=new WeakMap();
     let surface,model,selected,segment,view,period=0,from=0,to=0,drag=null,pan=null;
+    let diskView=fullDisk,diskPan=null,skipDiskClick=false,detail=0,orthosystole;
     let copies=[],otherLifts=[],previousLength,previousFirst;
     const length=()=>surface.lengths[0],offset=()=>period*length();
     const maxSpan=()=>Math.max(30,12*length());
     const minSpan=.75;
     const sameLift=(a,b)=>a.normal[1]*b.normal[1]>0 &&
-      Math.abs(a.distance-b.distance)<1e-8 && Math.abs(a.foot-b.foot)<1e-8;
+      Math.abs(a.distance-b.distance)<1e-7 && Math.abs(a.foot-b.foot)<1e-7;
+
+    function updateDiskLifts() {
+      copies=[-1,1].map(step=>({step,lift:G.translate(selected,step*length())}));
+      otherLifts=model.lifts.filter(lift=>!sameLift(lift,selected)&&!sameLift(lift,orthosystole.lift)
+        &&!copies.some(copy=>sameLift(lift,copy.lift)));
+    }
+    function locateSelection() {
+      select.value=String(model.lifts.findIndex(lift=>sameLift(lift,selected)));
+    }
+    function showDetail(level) {
+      if(model && level<=detail)return;
+      detail=level;
+      if(!developments.has(surface))developments.set(surface,[]);
+      const levels=developments.get(surface);
+      levels[detail]??=G.build(surface,detailRadii[detail]);
+      model=levels[detail];
+      select.replaceChildren(...model.lifts.map((lift,i)=>{
+        const option=document.createElement("option");
+        option.value=String(i);option.textContent=(i+1)+" · d = "+format(lift.distance,3);
+        return option;
+      }));
+      select.title="First-return lifts meeting the ball of hyperbolic radius "+format(model.radius,2)+
+        " about the disk origin.";
+      if(selected){locateSelection();updateDiskLifts();}
+    }
+    const zoomDetail=scale=>Math.min(detailRadii.length-1,Math.ceil(Math.log2(scale)));
+    function diskCenter(center){
+      const norm=Math.hypot(...center);
+      return norm>1?cscale(1/norm,center):center;
+    }
+    function fitDiskToSegment(arc,relativeSize=.28){
+      const {w,h,radius}=diskLayout(disk.clientWidth,disk.clientHeight,fullDisk);
+      const span=radius*Math.hypot(...csub(arc.q,arc.p));
+      const scale=clamp(relativeSize*Math.min(w,h)/span,1,maxDiskZoom);
+      return scale===1?fullDisk:{scale,center:cscale(.5,cadd(arc.p,arc.q))};
+    }
+    function redrawDisk() {
+      const translated=sameLift(selected,orthosystole.lift)?null:orthosystole;
+      const [p,q]=drawCover(disk,diskView,otherLifts,copies,selected,segment,translated);
+      for(const [handle,[x,y]] of [[departure,p],[arrival,q]]){
+        handle.style.left=x+"px";handle.style.top=y+"px";
+        handle.hidden=drag?.handle!==handle&&(x<0||x>disk.clientWidth||y<0||y>disk.clientHeight);
+      }
+      const scale=diskView.scale;
+      disk.classList.toggle("zoomed",scale>1);
+      $("cover-disk-zoom-in").disabled=scale===maxDiskZoom;
+      $("cover-disk-zoom-out").disabled=$("cover-disk-reset").disabled=scale===1;
+      $("cover-more-lifts").disabled=detail===detailRadii.length-1;
+      $("cover-disk-status").textContent=String(+scale.toFixed(1))+"× · "+model.lifts.length+" first-return lifts";
+    }
+    function setDiskView(view) {
+      diskView=view;
+      showDetail(zoomDetail(view.scale));
+      redrawDisk();
+    }
+    function zoomDisk(factor,anchor=diskView.center) {
+      const scale=clamp(diskView.scale*factor,1,maxDiskZoom);
+      if(scale===diskView.scale)return;
+      const center=cadd(anchor,cscale(diskView.scale/scale,csub(diskView.center,anchor)));
+      setDiskView(scale===1?fullDisk:{scale,center:diskCenter(center)});
+    }
 
     function resetView() {
-      view={center:offset(),span:Math.max(11,2.4*length())};
+      const span=length();
+      view={center:offset()+span/2,span};
     }
     function redrawVector() {
       const s=offset()+from;
       drawVector(vector,selected,offset(),length(),view,s,segment.theta);
       vector.setAttribute("aria-label","Outgoing tangent vector at s = "+format(s)+
-        " and angle "+format(segment.theta/pi,3)+" times pi. Viewing s from "+
+        " and angle "+format(segment.theta/pi,3)+" times pi. Arclength increases to the left. Viewing s from "+
         format(view.center-view.span/2,2)+" to "+format(view.center+view.span/2,2)+".");
       $("cover-zoom-in").disabled=view.span<=minSpan;
       $("cover-zoom-out").disabled=view.span>=maxSpan();
     }
     function redrawSegment(follow=true) {
       segment=G.segment(selected,from,to);
-      const [p,q]=drawCover(disk,otherLifts,copies,selected,segment);
-      for(const [handle,[x,y]] of [[departure,p],[arrival,q]]){
-        handle.style.left=x+"px";handle.style.top=y+"px";
-      }
+      redrawDisk();
       const s=offset()+from;
-      if(follow && Math.abs(s-view.center)>view.span/2)view.center=s;
-      $("cover-disk-center").textContent="Disk center s = "+String(+offset().toFixed(4));
+      if(follow && Math.abs(s-view.center)>view.span/2+1e-9)view.center=s;
+      $("cover-disk-center").textContent="Disk origin s = "+String(+offset().toFixed(4));
       $("cover-s").textContent=format(s);
       $("cover-angle").textContent=format(segment.theta/pi,3)+"π";
       $("cover-length").textContent=format(segment.length);
@@ -2269,17 +2469,32 @@ const SeminarCover=(()=>{
     function resetEndpoints() {
       ({from,to}=G.perpendicular(selected));
     }
-    function choose(index) {
-      const lift=model.lifts[index];
+    function choose(lift) {
       if(!lift)return;
-      selected=lift;select.value=String(index);resetEndpoints();
-      copies=[-1,1].map(step=>({step,lift:G.translate(selected,step*length())}));
-      otherLifts=model.lifts.filter(lift=>lift!==selected&&!copies.some(copy=>sameLift(lift,copy.lift)));
+      selected=lift;locateSelection();resetEndpoints();updateDiskLifts();
+    }
+    function showEndpoints() {
+      if(diskView.scale===1)return;
+      const p=G.point(G.central,from),q=G.point(selected,to);
+      const frame=diskLayout(disk.clientWidth,disk.clientHeight,diskView);
+      if([p,q].map(frame.toScreen).some(([x,y])=>x<10||x>frame.w-10||y<10||y>frame.h-10)){
+        diskView=fitDiskToSegment({p,q});
+        showDetail(zoomDetail(diskView.scale));
+      }
+    }
+    function revealOrthosystole() {
+      diskView=fitDiskToSegment(orthosystole,.17);
+      // The +1 translate is in the radius-7.4 window for the full length range.
+      showDetail(Math.max(2,zoomDetail(diskView.scale)));
+      choose(orthosystole.lift);
+      redrawSegment();
     }
     function translateSegment(step) {
       // Use the translated disk frame to keep the segment away from the rim.
       // The plot and readouts use the original arclength coordinate.
       period+=step;
+      view.center+=step*length();
+      showEndpoints();
       redrawSegment();
     }
     function zoom(factor,anchor=.5) {
@@ -2288,29 +2503,23 @@ const SeminarCover=(()=>{
       view.span=span;redrawVector();
     }
     function panBy(direction) {
-      view.center+=view.span*direction/3;redrawVector();
+      view.center-=view.span*direction/3;redrawVector();
     }
     function plotPosition(event) {
       const rect=vector.getBoundingClientRect(),box=vectorBounds(rect.width,rect.height);
       const x=event.clientX-rect.left,y=event.clientY-rect.top,width=box.r-box.l;
       if(x<box.l||x>box.r||y<box.top||y>box.b)return null;
-      return {fraction:(x-box.l)/width,width,height:box.b-box.top};
+      return {fraction:(box.r-x)/width,width,height:box.b-box.top};
     }
     function render(nextSurface,measuredLength,measuredFirst,force=false) {
       const changed=surface!==nextSurface;
       if(changed){
         surface=nextSurface;
-        period=0;resetView();
-        if(!developments.has(surface))developments.set(surface,G.build(surface));
-        model=developments.get(surface);
-        select.replaceChildren(...model.lifts.map((lift,i)=>{
-          const option=document.createElement("option");
-          option.value=String(i);option.textContent=(i+1)+" · d = "+format(lift.distance,3);
-          return option;
-        }));
-        select.title="First-return lifts meeting the ball of hyperbolic radius "+format(model.radius,2)+
-          " about the disk center. Teal marks the selected lift’s adjacent translates.";
-        choose(model.lifts.indexOf(model.preferred));
+        period=0;resetView();diskView=fullDisk;selected=null;model=null;
+        showDetail(0);
+        const lift=G.translate(model.preferred,length()),{from,to}=G.perpendicular(lift);
+        orthosystole={lift,...G.segment(lift,from,to)};
+        choose(model.preferred);
       }
       if(changed||force)redrawSegment(changed);
       if(changed||force||measuredLength!==previousLength||measuredFirst!==previousFirst){
@@ -2322,8 +2531,16 @@ const SeminarCover=(()=>{
         previousLength=measuredLength;previousFirst=measuredFirst;
       }
     }
-    select.onchange=()=>{choose(Number(select.value));redrawSegment();};
-    $("cover-orthogonal").onclick=()=>{resetEndpoints();redrawSegment();};
+    select.onchange=()=>{choose(model.lifts[Number(select.value)]);showEndpoints();redrawSegment();};
+    $("cover-orthogonal").onclick=()=>{resetEndpoints();showEndpoints();redrawSegment();};
+    $("cover-orthosystole-translate").onclick=revealOrthosystole;
+    $("cover-disk-zoom-in").onclick=()=>zoomDisk(1.6);
+    $("cover-disk-zoom-out").onclick=()=>zoomDisk(1/1.6);
+    $("cover-disk-reset").onclick=()=>setDiskView(fullDisk);
+    $("cover-more-lifts").onclick=()=>{
+      showDetail(Math.min(detail+1,detailRadii.length-1));
+      redrawDisk();
+    };
     $("cover-translate-up").onclick=()=>translateSegment(1);
     $("cover-translate-down").onclick=()=>translateSegment(-1);
     $("cover-pan-left").onclick=()=>panBy(-1);
@@ -2337,7 +2554,7 @@ const SeminarCover=(()=>{
       e.preventDefault();
       const units=e.deltaMode===1?16:e.deltaMode===2?point.height:1;
       if(Math.abs(e.deltaX)>Math.abs(e.deltaY)){
-        view.center+=e.deltaX*units*view.span/point.width;
+        view.center-=e.deltaX*units*view.span/point.width;
         redrawVector();
       }else zoom(Math.exp(clamp(e.deltaY*units,-600,600)/500),point.fraction);
     },{passive:false});
@@ -2349,7 +2566,7 @@ const SeminarCover=(()=>{
     };
     vector.onpointermove=e=>{
       if(pan?.id!==e.pointerId)return;
-      view.center=pan.center+(pan.x-e.clientX)*pan.scale;
+      view.center=pan.center+(e.clientX-pan.x)*pan.scale;
       redrawVector();
     };
     const endPan=e=>{
@@ -2363,21 +2580,54 @@ const SeminarCover=(()=>{
       e.preventDefault();e.stopPropagation();
       panBy(e.key==="ArrowLeft"?-1:1);
     };
+    $("cover-disk-plot").addEventListener("wheel",e=>{
+      if(!e.deltaY||drag||diskPan)return;
+      const anchor=fromPointer(disk,e,diskView);
+      if(diskView.scale===1&&(e.deltaY>0||Math.hypot(...anchor)>=1))return;
+      e.preventDefault();
+      const units=e.deltaMode===1?16:e.deltaMode===2?disk.clientHeight:1;
+      zoomDisk(Math.exp(-clamp(e.deltaY*units,-600,600)/450),anchor);
+    },{passive:false});
+    disk.onpointerdown=e=>{
+      if(!e.isPrimary||e.button!==0)return;
+      skipDiskClick=false;
+      if(diskView.scale===1)return;
+      const {radius}=diskLayout(disk.clientWidth,disk.clientHeight,diskView);
+      diskPan={id:e.pointerId,x:e.clientX,y:e.clientY,center:diskView.center,radius};
+      disk.setPointerCapture(e.pointerId);
+    };
+    disk.onpointermove=e=>{
+      if(diskPan?.id!==e.pointerId)return;
+      const dx=e.clientX-diskPan.x,dy=e.clientY-diskPan.y;
+      if(!skipDiskClick && Math.hypot(dx,dy)<3)return;
+      skipDiskClick=true;
+      const center=diskCenter(cadd(diskPan.center,[-dx/diskPan.radius,dy/diskPan.radius]));
+      diskView={scale:diskView.scale,center};
+      redrawDisk();
+    };
+    const endDiskPan=e=>{
+      if(diskPan?.id!==e.pointerId)return;
+      diskPan=null;
+      if(disk.hasPointerCapture(e.pointerId))disk.releasePointerCapture(e.pointerId);
+    };
+    disk.onpointerup=disk.onpointercancel=disk.onlostpointercapture=endDiskPan;
     disk.onclick=e=>{
-      const z=fromPointer(disk,e);
+      if(skipDiskClick){skipDiskClick=false;return;}
+      const z=fromPointer(disk,e,diskView);
       if(Math.hypot(...z)>=1)return;
-      const {radius}=diskLayout(disk.clientWidth,disk.clientHeight);
+      const {radius}=diskLayout(disk.clientWidth,disk.clientHeight,diskView);
       const copy=copies.find(({lift})=>Math.hypot(...csub(z,G.point(lift,0)))<6/radius);
       if(copy){translateSegment(copy.step);return;}
       let nearest=null,best=11/radius;
-      for(const lift of [...otherLifts,selected,...copies.map(copy=>copy.lift)]){
+      for(const lift of [...otherLifts,selected,orthosystole.lift,...copies.map(copy=>copy.lift)]){
         const distance=Math.abs(Math.hypot(z[0]-lift.center[0],z[1]-lift.center[1])-lift.radius);
         if(distance<best){best=distance;nearest=lift;}
       }
       if(!nearest)return;
       const translation=copies.find(copy=>copy.lift===nearest);
       if(translation){translateSegment(translation.step);return;}
-      choose(model.lifts.indexOf(nearest));redrawSegment();
+      if(nearest===orthosystole.lift){revealOrthosystole();return;}
+      choose(nearest);showEndpoints();redrawSegment();
     };
     for(const [handle,isDeparture] of [[departure,true],[arrival,false]]){
       const move=t=>{
@@ -2392,14 +2642,15 @@ const SeminarCover=(()=>{
       };
       handle.onpointermove=e=>{
         if(drag?.handle!==handle||drag.id!==e.pointerId)return;
-        const z=fromPointer(disk,e),norm=Math.hypot(...z);
-        const point=norm<.9999?z:cscale(.9999/norm,z);
+        const z=fromPointer(disk,e,diskView),norm=Math.hypot(...z);
+        const point=norm<.99995?z:cscale(.99995/norm,z);
         move(G.parameter(isDeparture?G.central:selected,point));
       };
       const stop=e=>{
         if(drag?.handle!==handle||drag.id!==e.pointerId)return;
         drag=null;
         if(handle.hasPointerCapture(e.pointerId))handle.releasePointerCapture(e.pointerId);
+        redrawDisk();
       };
       handle.onpointerup=handle.onpointercancel=handle.onlostpointercapture=stop;
       handle.onkeydown=e=>{
@@ -2585,7 +2836,7 @@ class CrossingSound {
   const clock=new Intl.NumberFormat("en-US",{minimumFractionDigits:2,maximumFractionDigits:2});
   const clamp=(x,lo,hi)=>Math.min(hi,Math.max(lo,x));
   const shareText=share=>share>0 && share<0.0001?"<0.01%":(100*share).toFixed(2)+"%";
-  let orbit,stats,seminarBuffer,t=0,localMin=0,group=1,playing=false,lastFrame=0,raf=0;
+  let orbit,stats,seminarBuffer,t=0,localMin=0,group=0,playing=false,lastFrame=0,raf=0;
   let fits=new Map(),fitWorker=null,loading=true,picking=false,coverOpen=false;
   let previousPlot="",previousFit=null,lastWindow="",fitError="",fitErrorKey="";
   const rangeWindow=1_000;
@@ -2601,7 +2852,8 @@ class CrossingSound {
   const lengthDialog=$("length-dialog"),lengthInput=$("gamma-length");
   const lengthApply=$("length-apply"),lengthStatus=$("length-status");
   const speedDialog=$("speed-dialog"),speedInput=$("play-rate"),speedStatus=$("speed-status");
-  const sectionCanvas=$("section"),cover=SeminarCover.mount($);
+  const sectionCanvas=$("section"),thresholdControl=$("return-threshold"),rangeChoice=$("range-choice");
+  const cover=SeminarCover.mount($);
   const trajectoryControls=["overview","detail","play","vector-open","length-open","cover-toggle"];
   const yieldToPage=()=>new Promise(resolve=>setTimeout(resolve,0));
 
@@ -2728,7 +2980,7 @@ class CrossingSound {
     if(!orbit||loading||drag||view===sectionView)return;
     sectionView=view;hoverPoint=null;
     const h=currentHits(),{selected,label,area}=selectedRegion();
-    plots.section(sectionCanvas,selected,h,label,area,sectionView);
+    plots.section(sectionCanvas,selected,h,label,area,sectionView,+thresholdControl.value);
     updateProbe(h);updateZoomControls();
   }
   function switchCover(open) {
@@ -2744,16 +2996,21 @@ class CrossingSound {
   }
   function renderComputation(h,n,force){
     const models=modelsFor(n);
-    const limit=+$("range-choice").value||Math.max(5,Math.ceil(stats.maximum[n]/5)*5);
+    const cutoff=+thresholdControl.value;
+    const limit=+rangeChoice.value||Math.max(5,Math.ceil(Math.max(stats.maximum[n],cutoff)/5)*5);
     const visible=$("show-fit").checked?models:empty;
     const sheet=plots.surface($("surface"),orbit,t);
     $("sheet-out").textContent=["Hexagon 1","Hexagon 2","Hexagon 3","Hexagon 4"][sheet];
     updateProbe(h);
-    const key=[h,group,limit,visible.length,$("precision").value].join("/");
+    const key=[h,group,limit,cutoff,visible.length,$("precision").value].join("/");
     if(force||key!==previousPlot){
       const {selected,label,area}=selectedRegion();
-      plots.section(sectionCanvas,selected,h,label,area,sectionView);
-      plots.distribution($("cdf"),selected,n,label,limit,visible);
+      const share=plots.section(sectionCanvas,selected,h,label,area,sectionView,cutoff);
+      const threshold=share===null?null:{value:cutoff,share,label:(100*share).toFixed(1)+"%"};
+      $("threshold-value").textContent=threshold?"x = "+cutoff.toFixed(2):"Off";
+      $("threshold-area").textContent=threshold?"Weighted area share of the full section ≈ "+threshold.label:
+        "Move the slider to shade the full section where r₁(v) < x.";
+      plots.distribution($("cdf"),selected,n,label,limit,visible,threshold);
       const items=[["gold","Total"]];
       if(visible.length)items.push(["model","Subtracted #"+visible.length],["residual","Residual"]);
       else if(group)items.push(["teal","From "+groupNames[group]],["rest","Other returns"]);
@@ -2765,7 +3022,9 @@ class CrossingSound {
       $("region-exact").textContent=shareText(exact);
       $("region-percent").textContent=n?shareText(arrivals/n):"—";
       sectionCanvas.setAttribute("aria-label",number.format(arrivals)+" of "+number.format(n)+" return endpoints lie in "+groupNames[group]+". Point colors show the time to the next crossing. The hollow point is awaiting its return."+(group?" Points in this region are brighter.":""));
-      $("cdf").setAttribute("aria-label","Return-time distribution from "+number.format(n)+" completed returns."+(visible.length?" Shows subtracted term "+visible.length+" and the residual after all subtractions.":" Contributions are grouped by departure vector."));
+      $("cdf").setAttribute("aria-label","Return-time distribution from "+number.format(n)+" completed returns."+
+        (threshold?" At x = "+cutoff.toFixed(2)+", approximate weighted area share is "+threshold.label+".":"")+
+        (visible.length?" Shows subtracted term "+visible.length+" and the residual after all subtractions.":" Contributions are grouped by departure vector."));
       previousPlot=key;
     }
     drawFits(n,models);
@@ -2875,8 +3134,8 @@ class CrossingSound {
         if(!response.ok)throw new Error("Recording unavailable");
         seminarBuffer=await response.arrayBuffer();
       }
-      install(seminarBuffer,250);note("");
-    }catch(_){seminarBuffer=null;await generate(F.initial,F.lengths[0],250);}
+      install(seminarBuffer,0);note("");
+    }catch(_){seminarBuffer=null;await generate(F.initial,F.lengths[0]);}
   }
 
   $("cover-toggle").onclick=()=>{if(orbit&&!loading)switchCover(!coverOpen);};
@@ -2929,7 +3188,15 @@ class CrossingSound {
     if(custom)note("Drag a rectangle on the section or choose Edit bounds.");
     render(true);
   };
-  $("range-choice").onchange=()=>render(true);$("show-fit").onchange=()=>render(true);
+  thresholdControl.oninput=()=>{
+    if(+rangeChoice.value>0&&+thresholdControl.value>+rangeChoice.value)rangeChoice.value=thresholdControl.max;
+    render();
+  };
+  rangeChoice.onchange=()=>{
+    if(+rangeChoice.value>0&&+thresholdControl.value>+rangeChoice.value)thresholdControl.value=rangeChoice.value;
+    render(true);
+  };
+  $("show-fit").onchange=()=>render(true);
   $("precision").onchange=()=>{stopFit();fitError="";render(true);};
   $("fit-next").onclick=()=>{
     if(loading||fitWorker)return;pause();setPicking(false);
